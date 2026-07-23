@@ -1,0 +1,51 @@
+# Explicit project name so container/volume names don't depend on the
+# checkout directory name.
+name: switchyard-opencode
+
+services:
+  switchyard:
+    build: .
+    container_name: switchyard-opencode
+    ports:
+      # Loopback only — never expose the router on the LAN.
+      - '127.0.0.1:4100:4100'
+    env_file:
+      - .env
+    volumes:
+      - ./route.yaml:/app/route.yaml:ro
+      # Named volume (not a bind mount — avoids host-permission surprises)
+      # so the routing JSONL survives `up -d --force-recreate` (key
+      # rotation) and image rebuilds. Retrieve it with `docker cp` /
+      # scripts/stats-snapshot.sh, or read the aggregate at
+      # GET /v1/routing/stats.
+      - switchyard-logs:/app/logs
+    # Adds the per-request routing JSONL on top of the image CMD.
+    command:
+      [
+        'switchyard',
+        '--routing-profiles',
+        '/app/route.yaml',
+        'serve',
+        '--host',
+        '0.0.0.0',
+        '--port',
+        '4100',
+        '--routing-log-file',
+        '/app/logs/routing.jsonl',
+      ]
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4100/health', timeout=3)",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  switchyard-logs:

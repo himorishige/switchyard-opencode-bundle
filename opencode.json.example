@@ -1,0 +1,20 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "switchyard": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Switchyard (Fireworks auto-routing)",
+      "options": {
+        "baseURL": "http://127.0.0.1:4100/v1",
+        "apiKey": "local-dummy"
+      },
+      "models": {
+        "auto": { "name": "auto — Switchyard routing" },
+        "strong-only": { "name": "strong-only — deepseek-v4-pro pinned" },
+        "weak-only": { "name": "weak-only — deepseek-v4-flash pinned" }
+      }
+    }
+  },
+  "model": "switchyard/auto",
+  "small_model": "switchyard/weak-only"
+}

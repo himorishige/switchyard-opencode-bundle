@@ -1,0 +1,66 @@
+# Switchyard route bundle for the opencode + Fireworks team bundle.
+#
+# Served with the stock CLI: `switchyard --routing-profiles route.yaml serve`.
+# This is the route-bundle format — migrated from the v2 profile config
+# (`serve --config` + serve.py adapter, kept in legacy-v2config/) after
+# upstream PR #119 marked that whole surface for removal. Route bundles are
+# the supported rail: deterministic routing, session affinity, enable_stats
+# (GET /v1/routing/stats) and `serve --routing-log-file` all live here.
+#
+# Tier pair (decided 2026-07-23): strong = deepseek-v4-pro,
+# weak = deepseek-v4-flash. The weak target doubles as the routing
+# classifier (production-proven pattern that avoids the classifier
+# cost inversion). ${FIREWORKS_API_KEY} is expanded by the bundle
+# loader from the container environment (.env via docker compose).
+
+defaults:
+  api_key: ${FIREWORKS_API_KEY}
+  base_url: https://api.fireworks.ai/inference/v1
+  format: openai
+  # extra_body: {} is load-bearing — an explicit (even empty) extra_body
+  # stops apply_deepseek_overrides() from injecting the vLLM
+  # `chat_template_kwargs` hint into deepseek-v4* targets, which
+  # Fireworks rejects with HTTP 400 "Extra inputs are not permitted".
+  # Defaults cascade onto every route target below.
+  extra_body: {}
+
+routes:
+  # First route = default model advertised on /v1/models.
+  # LLM-classifier routing tuned for coding-agent traffic (Claude Code /
+  # Codex / Cursor / opencode class harnesses): SIMPLE+MEDIUM -> weak,
+  # COMPLEX+REASONING -> strong, unknown -> strong, and turns planning
+  # 2+ tool calls escalate to strong.
+  auto:
+    type: deterministic
+    profile: coding_agent
+    classifier:
+      # api_key / base_url cascade from defaults. Reasoning suppression:
+      # the image patches the classifier's injected body to the
+      # Fireworks-compatible `reasoning_effort: "none"` (see Dockerfile) —
+      # classification runs ~1s instead of ~4-8s of chain-of-thought.
+      model: accounts/fireworks/models/deepseek-v4-flash
+      # Phase 2 tuning knobs: min_confidence (default 0.6) / fail_open
+      # (default true) / recent_turn_window (default 4) /
+      # max_request_chars / timeout_secs
+    strong:
+      model: accounts/fireworks/models/deepseek-v4-pro
+    weak:
+      model: accounts/fireworks/models/deepseek-v4-flash
+    fallback_target_on_evict: strong
+    # Pin the tier per conversation after 2 classified warmup turns
+    # (measured 2026-07-23: cuts classifier calls ~3x on an agentic loop
+    # and removes per-turn routing overhead after the pin). Trade-off:
+    # a pinned session no longer re-escalates (tool-planning escalation
+    # included) — fail-open verdicts never pin, and warmup keeps the
+    # first turns adaptive.
+    session_affinity: true
+    affinity_warmup_turns: 2
+
+  # Escape hatches: pin a single tier from the opencode model picker.
+  strong-only:
+    type: model
+    target: accounts/fireworks/models/deepseek-v4-pro
+
+  weak-only:
+    type: model
+    target: accounts/fireworks/models/deepseek-v4-flash
