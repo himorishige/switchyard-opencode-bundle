@@ -3,11 +3,9 @@
 opencode のリクエストを NeMo Switchyard が自動で strong / weak tier に振り分け、品質を保ったままコストを下げるローカルルーターです。各自の端末で Docker コンテナとして常駐させます。
 
 ```
-opencode ──(LLM)──→ Switchyard (127.0.0.1:4100) ──→ Fireworks AI
-                       └─ classifier（weak が兼任）が難易度を判定して振り分け
+opencode → Switchyard (127.0.0.1:4100) → Fireworks AI
+              └─ classifier（weak が兼任）が難易度を判定して振り分け
 ```
-
-必要な外部 API キーは **Fireworks の 1 本だけ**です。
 
 | route（opencode のモデル名） | 動作                                                         |
 | ---------------------------- | ------------------------------------------------------------ |
@@ -15,7 +13,7 @@ opencode ──(LLM)──→ Switchyard (127.0.0.1:4100) ──→ Fireworks AI
 | `strong-only`                | deepseek-v4-pro 固定（ルーティングを疑ったときの切り分け用） |
 | `weak-only`                  | deepseek-v4-flash 固定                                       |
 
-設定は `route.yaml`（Switchyard の route-bundle 形式）1 枚で、同梱のまま動きます。
+設定は `route.yaml`（Switchyard の route-bundle 形式）1 枚です。
 
 ## 前提
 
@@ -41,13 +39,13 @@ chmod 600 .env
 
 `.env` を開き、`FIREWORKS_API_KEY` を自分のキーに置き換えます。
 
-### 3. コンテナを起動
+### 3. ルーターを起動
 
 ```bash
 docker compose up -d --build
 ```
 
-ルーター（switchyard）コンテナが起動します。初回は Switchyard の Rust 拡張をビルドするため数分かかります。
+初回は Switchyard の Rust 拡張をビルドするため数分かかります。
 
 colima 等の Docker Desktop 以外の環境では、`docker compose` サブコマンドが入っていないことがあります。その場合はスタンドアロン版 compose を導入します。
 
@@ -101,7 +99,7 @@ cp opencode.jsonc.example ~/.config/opencode/opencode.json
 
 ### B. 既存のカスタム設定にマージする
 
-theme や他プロバイダなど独自の設定を足している場合は、上書きせず `provider` / `model` / `small_model` の 3 つのトップレベルキーを既存の JSON に追記します。
+theme や他プロバイダなど独自の設定を足している場合は、上書きせず次の 3 つのトップレベルキーを既存の JSON に追記します。
 
 ```json
 "provider": {
@@ -137,12 +135,6 @@ theme や他プロバイダなど独自の設定を足している場合は、�
 - `small_model` はタイトル生成などの補助コール用です。`weak-only` 固定にしてあります（auto に流すと小物が strong に化けることがあるため）
 - サブエージェントの扱い: 会話単位で classifier が個別に分類・ピン留めするため、軽いサブエージェントは自動で weak に落ちます。常に weak を強制したい場合は opencode の per-agent 設定（`"agent": {"<name>": {"model": "switchyard/weak-only"}}`）を使ってください
 
-## web 検索について
-
-本バンドルに web 検索ツールは**含まれません**（LLM ルーティング専用です）。標準の `websearch`（Exa 送信）を strict-privacy 設定で無効化していて代替が必要な場合は、公式 API ベースの検索ツールを各自導入してください。例: [webseek](https://github.com/dyoshikawa/webseek)（OpenAI / Gemini / Google Custom Search の API キーで動く MCP サーバー。opencode の Global 設定に `mcp` ブロックを追加して登録します）。
-
-補足: v2 では SearXNG（キー不要のメタ検索エンジン）を同梱していましたが、v3 で撤去しました。SearXNG は検索エンジンの結果ページを直接取得する方式のため、(1) 検索エンジン各社の利用規約に抵触する可能性がある、(2) 検索クエリの取り扱いに契約上の保証がない、という 2 点で、配布物の既定構成には不適切と判断したためです。公式 API 経由であれば (1) は解消し、(2) も各プロバイダの API 規約（学習不使用等）が適用されます。
-
 ## 運用
 
 | 操作                   | コマンド                                                                                                   |
@@ -152,20 +144,6 @@ theme や他プロバイダなど独自の設定を足している場合は、�
 | キーローテーション     | `.env` 更新後 `docker compose up -d --force-recreate`（`restart` はコンテナ作成時の env を再利用するため） |
 | 死活確認               | `curl -s http://127.0.0.1:4100/health`                                                                     |
 | 停止                   | `docker compose down`                                                                                      |
-
-### v2（SearXNG 同梱版）からの更新
-
-v2 で検索コンテナ（`switchyard-searxng`）を起動していた場合は、更新時に `--remove-orphans` を付けると自動で削除されます。稼働中のルーター本体とルーティングログには触れません。
-
-```bash
-git pull
-docker compose up -d --remove-orphans
-```
-
-あわせて手元で次の 2 点を片付けてください。
-
-- opencode の Global 設定（`~/.config/opencode/opencode.json`）から `mcp.searxng` ブロックを削除する
-- `.env` に `SEARXNG_SECRET=...` の行が残っていれば削除する（残っていても無害です）
 
 ### モデルを変更するには
 
@@ -221,10 +199,10 @@ curl -s http://127.0.0.1:4100/health
 
 ## セキュリティノート
 
-- リスナーは **127.0.0.1 バインドのみ**（Switchyard :4100）。LAN には公開されません
+- リスナーは **127.0.0.1 バインドのみ**。LAN には公開されません
 - Switchyard の Intake sink（リクエスト収集機構）は**無効**のままです（`--intake-enabled` を付けていません）。リクエスト本文が出ていく先は設定した Fireworks エンドポイントだけです
 - ルーティングログ（`/app/logs/routing.jsonl`）は Docker named volume（`switchyard-logs`）内に留まり、ホスト側には `stats-snapshot.sh` / `docker cp` で取り出したときだけ出ます。中身はルーティング判定とトークン数のみで、プロンプト本文は含まれません
-- 標準 `websearch`（exa.ai への送信）の無効化は opencode 側の設定です。「前提」の strict-privacy 設定を先に適用してください。代替の検索経路は本バンドルには含まれません（「web 検索について」参照）
+- web 検索の安全策（exa.ai 無効化）は本ルーターの管轄外です。web 検索経由の情報送信を絞りたい場合は、opencode 側で先に適用してください（「前提」参照）
 - 脚注: 平文 `.env` をどうしても避けたい場合は 1Password CLI の `op run` + secret reference でも起動できますが、Docker はコンテナ metadata に env を平文保存するため（`docker inspect` で見えます）利得は限定的です。本バンドルの標準は `.env` + `chmod 600` です
 
 ## 実装メモ（メンテナ向け）
@@ -236,5 +214,4 @@ curl -s http://127.0.0.1:4100/health
 - `session_affinity: true` + `affinity_warmup_turns: 2` を既定化（2026-07-23 実測: classifier 呼び出し −56%・classifier prompt tokens −55%・ピン後の切替ゼロ）。ピン後は tool-planning エスカレーションも効かなくなる点は既知のトレードオフ（fail-open 判定はピンされないため、低確信のまま固定されることはない）
 - 上流の profile-level `subagent_target`（#112）は components-v2 専用 + ヘッダー検知（opencode は非発火）のため不採用。サブエージェント対応は opencode 側設定で足りる
 - compose 構成は colima 環境（compose plugin は brew 導入）で実機検証済み（2026-07-23）: build → healthy → E2E 疎通 → `switchyard-logs` volume への JSONL 書き込み → `--force-recreate` 後のログ残存、全 PASS
-- v2 で同梱していた SearXNG サイドカー + mcp-searxng は v3（2026-07-24）で撤去。メタ検索のスクレイピング依存が、検索エンジン規約への適合とクエリ取り扱いの契約的保証の両面で配布物に不適と判断したため（「web 検索について」参照）。当時の設定仕様・検証記録は git 履歴の `docs/web-search.md` / `searxng/settings.yml` にある
 - `route.yaml` の `defaults.extra_body: {}` は load-bearing（`apply_deepseek_overrides()` の vLLM ヒント注入を抑止。上流 PR #122 マージ後の SHA に上げたら不要になる）

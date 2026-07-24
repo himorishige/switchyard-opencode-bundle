@@ -53,7 +53,4 @@
   "model": "switchyard/auto",
   // タイトル生成などの補助コールは weak 固定（auto だと strong に化けることがある）
   "small_model": "switchyard/weak-only"
-
-  // web 検索ツールは本バンドルには含まれません（README「web 検索について」参照）。
-  // 公式 API ベースの検索ツールを使う場合は、ここに "mcp" ブロックを各自追加してください。
 }
