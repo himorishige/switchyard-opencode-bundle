@@ -47,13 +47,15 @@ docker compose up -d --build
 
 初回は Switchyard の Rust 拡張をビルドするため数分かかります。
 
-colima 等で `docker compose` サブコマンドが無い環境では、先に plugin を導入します。
+colima 等の Docker Desktop 以外の環境では、`docker compose` サブコマンドが入っていないことがあります。その場合はスタンドアロン版 compose を導入します。
 
 ```bash
 brew install docker-compose
 ```
 
-続けて `~/.docker/config.json` に次のキーを追加します（既存の `auths` 等は残したままにします）。
+導入後は、本 README 内の `docker compose ...` を **`docker-compose ...`** に読み替えて実行してください（例: `docker-compose up -d --build`。中身は同じ compose v2 なので動作は変わりません）。
+
+`docker compose` のサブコマンド構文のまま使いたい場合のみ、`~/.docker/config.json` に次のキーを追加すると plugin として認識されます（既存の `auths` 等は残したままにします。パスは `brew --prefix` の出力に合わせてください。Apple Silicon は `/opt/homebrew`、Intel は `/usr/local`）。認識されない環境でも、スタンドアロン版の読み替えで問題ありません。
 
 ```json
 "cliPluginsExtraDirs": ["/opt/homebrew/lib/docker/cli-plugins"]
