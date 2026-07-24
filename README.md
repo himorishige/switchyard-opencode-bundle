@@ -83,11 +83,23 @@ curl -s http://127.0.0.1:4100/v1/models | head
 
 ## opencode 側の設定
 
-`opencode.json.example` の内容を **Global 設定**（`~/.config/opencode/opencode.json`。`opencode.jsonc` を使っている場合はそちら）に反映します。
+`opencode.jsonc.example` の内容を **Global 設定**（`~/.config/opencode/opencode.json`）に反映します。opencode は JSONC（コメント付き JSON）を正式サポートしているので、コメントはそのままで有効です。反映方法は 2 通りあります。
 
-### 既存の設定ファイルがある場合（マージ）
+### A. そのまま上書きする（新規、または strict-privacy 推奨構成のみで運用中）
 
-「前提」の strict-privacy 設定を先に済ませていると Global 設定は既に存在するため、こちらが本線です。次の 3 つのトップレベルキーを既存の JSON に追記します。
+`opencode.jsonc.example` は、[opencode-with-strict-privacy](https://github.com/cm-dyoshikawa/opencode-with-strict-privacy/blob/main/README.ja.md) の推奨グローバル設定と Switchyard の接続設定を**マージ済みの完成形**です。Global 設定が未作成、または strict-privacy の推奨構成のままなら、コピーするだけで完了します。
+
+```bash
+mkdir -p ~/.config/opencode
+cp opencode.jsonc.example ~/.config/opencode/opencode.json
+```
+
+- `opencode.jsonc` のファイル名で運用している場合は、そのファイルに上書きしてください（`.json` と `.jsonc` を両方置いたときの優先順位は公式に明記されていないため、二重に置かないこと）
+- strict-privacy の環境変数側の設定（`OPENCODE_ENABLE_EXA=0` 等）はこのファイルには含まれません。シェル rc への設定は別途済ませてください
+
+### B. 既存のカスタム設定にマージする
+
+theme や他プロバイダなど独自の設定を足している場合は、上書きせず次の 3 つのトップレベルキーを既存の JSON に追記します。
 
 ```json
 "provider": {
@@ -115,15 +127,6 @@ curl -s http://127.0.0.1:4100/v1/models | head
 - strict-privacy 系のキー（`share` / `autoupdate` / `tools` / `permission` 等）とは衝突しません。そのまま共存できます
 - `model` / `small_model` を既に設定していて、いまの既定モデルを残したい場合は、この 2 行を取り込まず、使うときだけモデルピッカーから選択してください
 - マージ後に opencode を再起動し、モデルピッカーに `Switchyard (Fireworks auto-routing)` のモデル群（`auto` / `strong-only` / `weak-only`）が出ることを確認してください
-
-### 設定ファイルがまだ無い場合
-
-コピーするだけで完了します。
-
-```bash
-mkdir -p ~/.config/opencode
-cp opencode.json.example ~/.config/opencode/opencode.json
-```
 
 ### 運用のポイント
 
