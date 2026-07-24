@@ -52,5 +52,20 @@
   // 既定モデル = 自動ルーティング
   "model": "switchyard/auto",
   // タイトル生成などの補助コールは weak 固定（auto だと strong に化けることがある）
-  "small_model": "switchyard/weak-only"
+  "small_model": "switchyard/weak-only",
+
+  // --- web 検索（キー不要・同梱 SearXNG） ---
+  // 無効化した websearch（Exa 送信）の代替。検索とページ取得のツールを
+  // mcp-searxng が提供し、実体はローカルの SearXNG コンテナ（127.0.0.1:8888）。
+  // Node.js 環境なら npx でも可: ["npx", "-y", "mcp-searxng"]
+  "mcp": {
+    "searxng": {
+      "type": "local",
+      "command": ["bun", "x", "mcp-searxng"],
+      "environment": {
+        "SEARXNG_URL": "http://127.0.0.1:8888"
+      },
+      "enabled": true
+    }
+  }
 }

@@ -1,2 +1,4 @@
 .env
 stats-out/
+searxng/*
+!searxng/settings.yml

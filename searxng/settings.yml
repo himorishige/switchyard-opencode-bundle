@@ -1,0 +1,16 @@
+# Minimal SearXNG override for local API-backend use (bundle v2).
+# The three load-bearing settings:
+#   - search.formats must include json (else /search?format=json -> 403)
+#   - server.limiter false (link_token bot detection would block API calls)
+#   - secret key comes from the SEARXNG_SECRET env var (.env)
+use_default_settings: true
+
+server:
+  limiter: false
+  public_instance: false
+  image_proxy: false
+
+search:
+  formats:
+    - html
+    - json

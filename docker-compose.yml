@@ -47,5 +47,33 @@ services:
       retries: 3
       start_period: 15s
 
+  # Keyless web-search backend (bundle v2). opencode reaches it through the
+  # mcp-searxng tool (see opencode.jsonc.example); only the agent's search
+  # query strings leave the machine, toward regular search engines.
+  searxng:
+    image: docker.io/searxng/searxng:latest
+    container_name: switchyard-searxng
+    ports:
+      # Loopback only — never expose the search UI/API on the LAN.
+      - '127.0.0.1:8888:8080'
+    volumes:
+      # rw: the container writes generated files next to settings.yml
+      # (kept out of git via .gitignore).
+      - ./searxng:/etc/searxng:rw
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8888/
+      # Set in .env: SEARXNG_SECRET=$(openssl rand -hex 32)
+      - SEARXNG_SECRET=${SEARXNG_SECRET:-}
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    logging:
+      driver: 'json-file'
+      options: { max-size: '1m', max-file: '1' }
+    restart: unless-stopped
+
 volumes:
   switchyard-logs:
