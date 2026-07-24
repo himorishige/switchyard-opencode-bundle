@@ -237,7 +237,7 @@ curl -s http://127.0.0.1:4100/health
 - 検索経路で外部に出るのは検索クエリ文字列のみ。SearXNG はローカル動作で、クエリのプロファイリングを行う中間事業者は存在しません。`SEARXNG_SECRET` はローカルコンテナ用のシークレットで、外部サービスの認証情報ではありません
 - Switchyard の Intake sink（リクエスト収集機構）は**無効**のままです（`--intake-enabled` を付けていません）。リクエスト本文が出ていく先は設定した Fireworks エンドポイントだけです
 - ルーティングログ（`/app/logs/routing.jsonl`）は Docker named volume（`switchyard-logs`）内に留まり、ホスト側には `stats-snapshot.sh` / `docker cp` で取り出したときだけ出ます。中身はルーティング判定とトークン数のみで、プロンプト本文は含まれません
-- web 検索の安全策（exa.ai 無効化・webseek 代替）は本ルーターの管轄外です。web 検索経由の情報送信を絞りたい場合は、opencode 側で先に適用してください（「前提」参照）
+- 標準 `websearch`（exa.ai への送信）の無効化は opencode 側の設定です。「前提」の strict-privacy 設定を先に適用してください。代替の検索経路は同梱の SearXNG が担います（「web 検索」章参照）
 - 脚注: 平文 `.env` をどうしても避けたい場合は 1Password CLI の `op run` + secret reference でも起動できますが、Docker はコンテナ metadata に env を平文保存するため（`docker inspect` で見えます）利得は限定的です。本バンドルの標準は `.env` + `chmod 600` です
 
 ## 実装メモ（メンテナ向け）
