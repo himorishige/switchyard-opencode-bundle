@@ -150,14 +150,12 @@ theme や他プロバイダなど独自の設定を足している場合は、�
 
 ## web 検索（キー不要・同梱 SearXNG）
 
-opencode 標準の `websearch` ツールは検索クエリを外部のホステッド MCP（Exa / Parallel）へ送るため無効化する前提です（「前提」の strict-privacy 参照）。その代替として、同梱の SearXNG コンテナ + [mcp-searxng](https://github.com/ihor-sokoliuk/mcp-searxng) ツールがローカルで検索を担います。検索用の外部 API キーは不要です。
+無効化した標準 `websearch`（Exa 送信）の代替として、同梱の SearXNG コンテナ + [mcp-searxng](https://github.com/ihor-sokoliuk/mcp-searxng) ツールがローカルで検索を担います。検索用の外部 API キーは不要で、エージェントには `searxng_web_search`（検索）と `web_url_read`（ページ取得）のツールが生えます。**外部に出るのは検索クエリ文字列だけ**で、会話・コード本文は検索経路に乗りません。
 
-- エージェントには `searxng_web_search`（検索）と `web_url_read`（ページ取得 → markdown）のツールが生えます
-- **外部に出るのは検索クエリ文字列だけ**で、Bing / DuckDuckGo / Google などの検索エンジンに通常の検索として届きます。会話・コード本文は検索経路には乗りません（LLM 経路の送信先は Fireworks のみ）
-- 逆に言えば、クエリ文字列に含めた語は検索エンジンに届きます。顧客名や未公開のコード名で直接検索しない、という通常の検索と同じ節度は必要です
-- 複数エンジンに同時照会（fan-out）するため、特定エンジンが rate limit を返しても他エンジンが結果をカバーします。エンジンの選定・無効化は `searxng/settings.yml` で調整できます
 - 動作確認: `opencode run "searxng_web_search で 'test' を検索して 1 件目のタイトルを教えて"`
 - 使わない場合: opencode 設定の `mcp.searxng.enabled` を `false` にし、起動を `docker compose up -d --build switchyard` に変えるだけです
+
+仕組み・データフロー図・仕様・トラブルシュートの詳細は **[docs/web-search.md](docs/web-search.md)** を参照してください。
 
 ## 運用
 
