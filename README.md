@@ -167,6 +167,18 @@ theme や他プロバイダなど独自の設定を足している場合は、�
 | 死活確認               | `curl -s http://127.0.0.1:4100/health`                                                                     |
 | 停止                   | `docker compose down`                                                                                      |
 
+### ルーターのみの旧構成からの更新（web 検索の追加）
+
+既にルーターを起動中でも、コンテナの作り直しは不要です。compose が差分だけを適用するため、稼働中の switchyard コンテナとルーティングログには触れず、検索コンテナだけが新規作成されます。
+
+```bash
+git pull
+echo "SEARXNG_SECRET=$(openssl rand -hex 32)" >> .env
+docker compose up -d --build
+```
+
+あわせて opencode の Global 設定に `mcp.searxng` ブロックを追記してください（「opencode 側の設定」参照）。`SEARXNG_SECRET` を入れ忘れたまま起動してしまった場合は、追記後に `docker compose up -d --force-recreate searxng` で検索コンテナだけ作り直せば大丈夫です。
+
 ### モデルを変更するには
 
 tier の向き先は `route.yaml` の model 行で決まります。例として strong を deepseek-v4-pro から GLM-5.2 に切り替える場合、次の 2 箇所を書き換えます。
