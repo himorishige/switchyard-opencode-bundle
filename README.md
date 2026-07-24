@@ -1,4 +1,4 @@
-# Switchyard for opencode + Fireworks（チーム配布バンドル）
+# Switchyard for opencode + Fireworks
 
 opencode のリクエストを NeMo Switchyard が自動で strong / weak tier に振り分け、品質を保ったままコストを下げるローカルルーターです。各自の端末で Docker コンテナとして常駐させます。
 
@@ -18,43 +18,88 @@ opencode → Switchyard (127.0.0.1:4100) → Fireworks AI
 ## 前提
 
 - Docker（Docker Desktop / colima 等）
-- Fireworks 試用 Org の個人 API キー（[発行ページ](https://app.fireworks.ai/settings/users/api-keys)。1Password に保管）
-- opencode セットアップ済み（[opencode-with-strict-privacy](https://github.com/cm-dyoshikawa/opencode-with-strict-privacy) の MUST 項目——exa.ai 無効化・share 無効化を **Global スコープ**で——を先に済ませること）
+- Fireworks の API キー（[発行ページ](https://app.fireworks.ai/settings/users/api-keys)）
+- opencode セットアップ済み（web 検索経由の情報送信を絞りたい場合は [opencode-with-strict-privacy](https://github.com/cm-dyoshikawa/opencode-with-strict-privacy) の設定——exa.ai 無効化・share 無効化を **Global スコープ**で——を先に済ませておくことを推奨）
 
 ## セットアップ
 
+### 1. リポジトリを取得
+
 ```bash
-# 1. このリポジトリを clone してリポジトリ直下へ
 git clone https://github.com/himorishige/switchyard-opencode-bundle.git
 cd switchyard-opencode-bundle
+```
 
-# 2. API キーを配置（1Password から手動コピー）
+### 2. API キーを配置
+
+```bash
 cp .env.example .env
 chmod 600 .env
-# .env を編集して FIREWORKS_API_KEY を実キーに置き換える
-
-# 3. 起動
-docker compose up -d --build
-# colima 等で `docker compose` が無い場合は plugin を導入（macmini で検証済み）:
-#   brew install docker-compose
-#   ~/.docker/config.json に "cliPluginsExtraDirs": ["/opt/homebrew/lib/docker/cli-plugins"] を追加
-# それも避けたい場合の docker run 代替（route.yaml はイメージに焼き込み済み。
-# ただしログ永続化と healthcheck は compose 版のみ）:
-#   docker build -t switchyard-opencode . && \
-#   docker run -d --name switchyard-opencode --env-file .env \
-#     -p 127.0.0.1:4100:4100 --restart unless-stopped switchyard-opencode
-
-# 4. 動作確認
-curl -s http://127.0.0.1:4100/health          # {"status":"ok"}
-curl -s http://127.0.0.1:4100/v1/models | head  # auto / strong-only / weak-only が並ぶ
 ```
+
+`.env` を開き、`FIREWORKS_API_KEY` を自分のキーに置き換えます。
+
+### 3. ルーターを起動
+
+```bash
+docker compose up -d --build
+```
+
+初回は Switchyard の Rust 拡張をビルドするため数分かかります。
+
+colima 等で `docker compose` サブコマンドが無い環境では、先に plugin を導入します。
+
+```bash
+brew install docker-compose
+```
+
+続けて `~/.docker/config.json` に次のキーを追加します（既存の `auths` 等は残したままにします）。
+
+```json
+"cliPluginsExtraDirs": ["/opt/homebrew/lib/docker/cli-plugins"]
+```
+
+compose を使わない場合は docker run でも起動できます（`route.yaml` はイメージに焼き込み済み。ただしログ永続化と healthcheck は compose 版のみ）。
+
+```bash
+docker build -t switchyard-opencode .
+docker run -d --name switchyard-opencode --env-file .env \
+  -p 127.0.0.1:4100:4100 --restart unless-stopped switchyard-opencode
+```
+
+### 4. 動作確認
+
+```bash
+curl -s http://127.0.0.1:4100/health
+# → {"status":"ok"}
+
+curl -s http://127.0.0.1:4100/v1/models | head
+# → auto / strong-only / weak-only が並ぶ
+```
+
+起動できたら、次の「opencode 側の設定」へ進みます。
 
 ## opencode 側の設定
 
-`opencode.json.example` の `provider.switchyard` ブロックを **Global 設定**（`~/.config/opencode/opencode.json`）にマージしてください。既定モデルが `switchyard/auto` になります。
+`opencode.json.example` の内容を **Global 設定**（`~/.config/opencode/opencode.json`）に反映します。
+
+opencode の設定ファイルをまだ作っていない場合は、コピーするだけで完了します。
+
+```bash
+mkdir -p ~/.config/opencode
+cp opencode.json.example ~/.config/opencode/opencode.json
+```
+
+### 既存の opencode.json がある場合のマージ注意点
+
+- `provider` オブジェクトの**中に** `switchyard` エントリを追加してください。example の `provider` ブロックごと貼り付けて置き換えると、既存のプロバイダ設定が消えます
+- `model` / `small_model` はトップレベルキーです。Switchyard を既定にするなら `"switchyard/auto"` / `"switchyard/weak-only"` に書き換え、いまの既定モデルを残すならこの 2 行は取り込まず、使うときだけモデルピッカーから選択してください
+- マージ後に opencode を再起動し、モデルピッカーに `Switchyard (Fireworks auto-routing)` のモデル群（`auto` / `strong-only` / `weak-only`）が出ることを確認してください
+
+### 運用のポイント
 
 - モデル切替は opencode のモデルピッカーから `auto` / `strong-only` / `weak-only` を選択
-- Switchyard を止めたいとき（障害切り分け等）は、ピッカーから素の `fireworks-ai/...` モデルを選べば直結にフォールバックできます（AIXC ガイドの標準セットアップ）
+- Switchyard を止めたいとき（障害切り分け等）は、opencode 側に Fireworks 直結のプロバイダ設定があれば、ピッカーから素の `fireworks-ai/...` モデルを選んで直結にフォールバックできます
 - `small_model` はタイトル生成などの補助コール用です。`weak-only` 固定にしてあります（auto に流すと小物が strong に化けることがあるため）
 - サブエージェントの扱い: 会話単位で classifier が個別に分類・ピン留めするため、軽いサブエージェントは自動で weak に落ちます。常に weak を強制したい場合は opencode の per-agent 設定（`"agent": {"<name>": {"model": "switchyard/weak-only"}}`）を使ってください
 
@@ -68,15 +113,15 @@ curl -s http://127.0.0.1:4100/v1/models | head  # auto / strong-only / weak-only
 | 死活確認               | `curl -s http://127.0.0.1:4100/health`                                                                     |
 | 停止                   | `docker compose down`                                                                                      |
 
-### 週次レビュー（ルーティング実績の回収）
+### 定期レビュー（ルーティング実績の回収）
 
-毎週金曜（目安）に各自 1 コマンド:
+週次など定期のタイミングで 1 コマンド:
 
 ```bash
 ./scripts/stats-snapshot.sh
 ```
 
-`stats-out/` に集計 JSON + per-request ログ（JSONL）が日付・ユーザー名つきで保存され、route 別のリクエスト数・トークン数サマリーが表示されます。出力 2 ファイルを [AIXC 成果報告フォルダ](https://drive.google.com/drive/u/0/folders/0AMlGENSwjZu5Uk9PVA)へアップロードしてください。
+`stats-out/` に集計 JSON + per-request ログ（JSONL）が日付・ユーザー名つきで保存され、route 別のリクエスト数・トークン数サマリーが表示されます。出力 2 ファイルは、プロジェクトで指定された方法（共有フォルダへのアップロード等）で収集してください。
 
 手動で見たいときの生アクセス:
 
@@ -85,23 +130,23 @@ curl -s http://127.0.0.1:4100/v1/models | head  # auto / strong-only / weak-only
 | 集計スナップショット      | `curl -s http://127.0.0.1:4100/v1/routing/stats \| python3 -m json.tool` | モデル別リクエスト数・トークン数の累計（**コンテナ再起動でリセット**）        |
 | per-request ログ（JSONL） | `docker cp switchyard-opencode:/app/logs/routing.jsonl ./routing.jsonl`  | 1 リクエスト 1 行（選択 tier・モデル・トークン。named volume 永続で耐久記録） |
 
-**使用量・コストの正**: [Fireworks ダッシュボード](https://app.fireworks.ai/)のモデル別使用量を見てください。strong（deepseek-v4-pro）と weak（deepseek-v4-flash）は別モデルなので、**モデル別使用量がそのまま tier 分布 × コスト**です。これが削減費用レポート（AIXC 成果報告）の材料になります。上の stats はルーティング内訳の分析用です。
+**使用量・コストの正**: [Fireworks ダッシュボード](https://app.fireworks.ai/)のモデル別使用量を見てください。strong（deepseek-v4-pro）と weak（deepseek-v4-flash）は別モデルなので、**モデル別使用量がそのまま tier 分布 × コスト**です。これが削減効果レポートの材料になります。上の stats はルーティング内訳の分析用です。
 
 ## セキュリティノート
 
 - リスナーは **127.0.0.1 バインドのみ**。LAN には公開されません
 - Switchyard の Intake sink（リクエスト収集機構）は**無効**のままです（`--intake-enabled` を付けていません）。リクエスト本文が出ていく先は設定した Fireworks エンドポイントだけです
 - ルーティングログ（`/app/logs/routing.jsonl`）は Docker named volume（`switchyard-logs`）内に留まり、ホスト側には `stats-snapshot.sh` / `docker cp` で取り出したときだけ出ます。中身はルーティング判定とトークン数のみで、プロンプト本文は含まれません
-- web 検索の安全策（exa.ai 無効化・webseek 代替）は本ルーターの管轄外です。strict-privacy の MUST 項目を必ず先に適用してください
-- 脚注: 平文 `.env` をどうしても避けたい場合は 1Password CLI の `op run` + secret reference でも起動できますが、Docker はコンテナ metadata に env を平文保存するため（`docker inspect` で見えます）利得は限定的です。チーム標準は `.env` + `chmod 600` です
+- web 検索の安全策（exa.ai 無効化・webseek 代替）は本ルーターの管轄外です。web 検索経由の情報送信を絞りたい場合は、opencode 側で先に適用してください（「前提」参照）
+- 脚注: 平文 `.env` をどうしても避けたい場合は 1Password CLI の `op run` + secret reference でも起動できますが、Docker はコンテナ metadata に env を平文保存するため（`docker inspect` で見えます）利得は限定的です。本バンドルの標準は `.env` + `chmod 600` です
 
 ## 実装メモ（メンテナ向け）
 
-- `route.yaml` は Switchyard の **route-bundle 形式**（`switchyard --routing-profiles route.yaml serve`）。旧 v2 profile config（`serve --config` + `serve.py` アダプタ）は上流 PR #119 で撤去予定のため移行済み。旧ファイルは `legacy-v2config/` に退避
+- `route.yaml` は Switchyard の **route-bundle 形式**（`switchyard --routing-profiles route.yaml serve`）。旧 v2 profile config（`serve --config` + `serve.py` アダプタ）は上流 PR #119 で撤去予定のため移行済み
 - イメージは git main の commit SHA ピン（Dockerfile の `SWITCHYARD_SHA`）。PyPI v0.1.0 は streaming usage 修正（PR #64）未収載のため使わない
 - classifier の思考抑制は `request_processor.py` への sed パッチで実現（vLLM 語彙 `chat_template_kwargs` → Fireworks 互換の `reasoning_effort: "none"` に置換。2026-07-23 実測: 判定 18/18 一致・2.7〜4.2 倍高速）。deterministic 型に `disable_reasoning` ノブが無いための措置で、上流には「抑制語彙のプロバイダ対応」を issue 候補として持つ
 - 注意: 上流 PR #123（fireworks を deny リストに追加）がマージされた SHA に上げると auto-detect が False になり注入自体が止まる（安全だが思考が復活して低速化）。SHA を上げる際は本パッチとの整合を再確認すること
 - `session_affinity: true` + `affinity_warmup_turns: 2` を既定化（2026-07-23 実測: classifier 呼び出し −56%・classifier prompt tokens −55%・ピン後の切替ゼロ）。ピン後は tool-planning エスカレーションも効かなくなる点は既知のトレードオフ（fail-open 判定はピンされないため、低確信のまま固定されることはない）
 - 上流の profile-level `subagent_target`（#112）は components-v2 専用 + ヘッダー検知（opencode は非発火）のため不採用。サブエージェント対応は opencode 側設定で足りる
-- compose 構成は 2026-07-23 に colima（macmini、compose plugin は brew 導入）で実機検証済み: build → healthy → E2E 疎通 → `switchyard-logs` volume への JSONL 書き込み → `--force-recreate` 後のログ残存、全 PASS
+- compose 構成は colima 環境（compose plugin は brew 導入）で実機検証済み（2026-07-23）: build → healthy → E2E 疎通 → `switchyard-logs` volume への JSONL 書き込み → `--force-recreate` 後のログ残存、全 PASS
 - `route.yaml` の `defaults.extra_body: {}` は load-bearing（`apply_deepseek_overrides()` の vLLM ヒント注入を抑止。上流 PR #122 マージ後の SHA に上げたら不要になる）

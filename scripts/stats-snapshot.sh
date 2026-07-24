@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Weekly routing-stats snapshot for the AIXC cost report.
+# Routing-stats snapshot for the periodic cost-reduction review.
 #
 # Collects two files from the running switchyard-opencode container into
 # ./stats-out/ and prints a per-route summary:
@@ -50,4 +50,4 @@ PY
 echo
 echo "Saved: $STATS_FILE"
 echo "       $LOG_FILE"
-echo "Next : upload both to the AIXC report folder (README「週次レビュー」参照)"
+echo "Next : submit both files as designated by your project (README「定期レビュー」参照)"
