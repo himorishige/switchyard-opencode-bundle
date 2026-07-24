@@ -113,6 +113,39 @@ cp opencode.json.example ~/.config/opencode/opencode.json
 | 死活確認               | `curl -s http://127.0.0.1:4100/health`                                                                     |
 | 停止                   | `docker compose down`                                                                                      |
 
+### モデルを変更するには
+
+tier の向き先は `route.yaml` の model 行で決まります。例として strong を deepseek-v4-pro から GLM-5.2 に切り替える場合、次の 2 箇所を書き換えます。
+
+1 箇所目は `routes.auto` 配下です（自動ルーティングの振り分け先）。
+
+```yaml
+strong:
+  model: accounts/fireworks/models/glm-5p2
+```
+
+2 箇所目は `routes.strong-only` 配下です（ピン留めルートも合わせて変更します）。
+
+```yaml
+strong-only:
+  type: model
+  target: accounts/fireworks/models/glm-5p2
+```
+
+編集後は restart だけで反映されます（bind-mount のため rebuild 不要）。
+
+```bash
+docker compose restart
+curl -s http://127.0.0.1:4100/health
+```
+
+注意点は次のとおりです。
+
+- 使えるモデル ID は [Fireworks serverless カタログ](https://app.fireworks.ai/models?capability=serverless)で確認できます
+- opencode 側は route 名（`auto` / `strong-only` / `weak-only`）しか見ていないため、`opencode.json` の変更は不要です。モデルピッカーの表示名も実態に合わせたい場合は、`opencode.json` の `models` 配下の `name` を書き換えてください
+- `classifier.model` を変更した場合は、変更後に 1 リクエスト流して動作確認してください。イメージに組み込んである思考抑制（`reasoning_effort: "none"`）は deepseek-v4-flash で受理を実測確認したもので、モデルによっては拒否される可能性があります
+- `defaults.extra_body: {}` は消さないでください（deepseek-v4 系ターゲット使用時の HTTP 400 回避。他モデルの場合も残して無害です）
+
 ### 定期レビュー（ルーティング実績の回収）
 
 週次など定期のタイミングで 1 コマンド:
