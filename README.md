@@ -19,7 +19,7 @@ opencode → Switchyard (127.0.0.1:4100) → Fireworks AI
 
 - Docker（Docker Desktop / colima 等）
 - Fireworks の API キー（[発行ページ](https://app.fireworks.ai/settings/users/api-keys)）
-- opencode セットアップ済み（web 検索経由の情報送信を絞りたい場合は [opencode-with-strict-privacy](https://github.com/cm-dyoshikawa/opencode-with-strict-privacy) の設定——exa.ai 無効化・share 無効化を **Global スコープ**で——を先に済ませておくことを推奨）
+- opencode セットアップ済み（web 検索経由の情報送信を絞りたい場合は [opencode-with-strict-privacy](https://github.com/cm-dyoshikawa/opencode-with-strict-privacy/blob/main/README.ja.md) の設定——exa.ai 無効化・share 無効化を **Global スコープ**で——を先に済ませておくことを推奨）
 
 ## セットアップ
 
@@ -83,20 +83,47 @@ curl -s http://127.0.0.1:4100/v1/models | head
 
 ## opencode 側の設定
 
-`opencode.json.example` の内容を **Global 設定**（`~/.config/opencode/opencode.json`）に反映します。
+`opencode.json.example` の内容を **Global 設定**（`~/.config/opencode/opencode.json`。`opencode.jsonc` を使っている場合はそちら）に反映します。
 
-opencode の設定ファイルをまだ作っていない場合は、コピーするだけで完了します。
+### 既存の設定ファイルがある場合（マージ）
+
+「前提」の strict-privacy 設定を先に済ませていると Global 設定は既に存在するため、こちらが本線です。次の 3 つのトップレベルキーを既存の JSON に追記します。
+
+```json
+"provider": {
+  "switchyard": {
+    "npm": "@ai-sdk/openai-compatible",
+    "name": "Switchyard (Fireworks auto-routing)",
+    "options": {
+      "baseURL": "http://127.0.0.1:4100/v1",
+      "apiKey": "local-dummy"
+    },
+    "models": {
+      "auto": { "name": "auto — Switchyard routing" },
+      "strong-only": { "name": "strong-only — deepseek-v4-pro pinned" },
+      "weak-only": { "name": "weak-only — deepseek-v4-flash pinned" }
+    }
+  }
+},
+"model": "switchyard/auto",
+"small_model": "switchyard/weak-only"
+```
+
+マージ時の注意点は次のとおりです。
+
+- 既に `provider` キーがある場合は、その**中に** `switchyard` エントリだけを追加してください。`provider` ブロックごと貼り付けて置き換えると、既存のプロバイダ設定が消えます
+- strict-privacy 系のキー（`share` / `autoupdate` / `tools` / `permission` 等）とは衝突しません。そのまま共存できます
+- `model` / `small_model` を既に設定していて、いまの既定モデルを残したい場合は、この 2 行を取り込まず、使うときだけモデルピッカーから選択してください
+- マージ後に opencode を再起動し、モデルピッカーに `Switchyard (Fireworks auto-routing)` のモデル群（`auto` / `strong-only` / `weak-only`）が出ることを確認してください
+
+### 設定ファイルがまだ無い場合
+
+コピーするだけで完了します。
 
 ```bash
 mkdir -p ~/.config/opencode
 cp opencode.json.example ~/.config/opencode/opencode.json
 ```
-
-### 既存の opencode.json がある場合のマージ注意点
-
-- `provider` オブジェクトの**中に** `switchyard` エントリを追加してください。example の `provider` ブロックごと貼り付けて置き換えると、既存のプロバイダ設定が消えます
-- `model` / `small_model` はトップレベルキーです。Switchyard を既定にするなら `"switchyard/auto"` / `"switchyard/weak-only"` に書き換え、いまの既定モデルを残すならこの 2 行は取り込まず、使うときだけモデルピッカーから選択してください
-- マージ後に opencode を再起動し、モデルピッカーに `Switchyard (Fireworks auto-routing)` のモデル群（`auto` / `strong-only` / `weak-only`）が出ることを確認してください
 
 ### 運用のポイント
 
