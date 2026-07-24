@@ -14,3 +14,6 @@ search:
   formats:
     - html
     - json
+  # Feeds /autocompleter (the searxng_search_suggestions MCP tool).
+  # Default is "" (disabled), which makes that tool return empty arrays.
+  autocomplete: 'duckduckgo'

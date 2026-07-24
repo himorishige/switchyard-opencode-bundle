@@ -117,6 +117,8 @@ sequenceDiagram
 
 JSON API のレスポンス主要フィールドは `query` / `results[]`（`url` / `title` / `content` / `score` / `engine`）/ `answers` / `suggestions` / `unresponsive_engines` です。
 
+補足として `search.autocomplete: "duckduckgo"` も有効化しています。`searxng_search_suggestions` ツールが叩く `/autocompleter` エンドポイントの供給元で、SearXNG のデフォルト（無効）のままだとこのツールは常に空配列を返します。検索結果 JSON に付く `suggestions`（関連検索）とは別系統です。
+
 ## 運用
 
 - 特定エンジンが `too many requests` を返しても、複数エンジンへの fan-out により他エンジンが結果をカバーします（`unresponsive_engines` で観測可能）。Google 系がもっとも制限が厳しく、Bing / DuckDuckGo は比較的安定という傾向があります
@@ -126,12 +128,13 @@ JSON API のレスポンス主要フィールドは `query` / `results[]`（`url
 
 ## トラブルシュート
 
-| 症状                              | 原因と対処                                                                                                                                                                     |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `/search?format=json` が 403      | `searxng/settings.yml` の `search.formats` に `json` が無い。同梱の settings.yml がマウントされているか確認（`docker compose config` で volume を確認）                        |
-| 検索ツールが opencode に生えない  | `bun`（または Node.js）が PATH に無く mcp-searxng を起動できていない。`bun x mcp-searxng` を手で実行して確認。Node 環境なら `command` を `["npx", "-y", "mcp-searxng"]` に変更 |
-| 結果が 0 件・特定エンジンだけ失敗 | 一時的な rate limit。`unresponsive_engines` を確認し、頻発するエンジンは settings.yml で無効化                                                                                 |
-| コンテナが起動しない              | `.env` の `SEARXNG_SECRET` 未設定。README のセットアップ手順 2 のコマンドで生成・追記する                                                                                      |
+| 症状                                  | 原因と対処                                                                                                                                                                     |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `/search?format=json` が 403          | `searxng/settings.yml` の `search.formats` に `json` が無い。同梱の settings.yml がマウントされているか確認（`docker compose config` で volume を確認）                        |
+| 検索ツールが opencode に生えない      | `bun`（または Node.js）が PATH に無く mcp-searxng を起動できていない。`bun x mcp-searxng` を手で実行して確認。Node 環境なら `command` を `["npx", "-y", "mcp-searxng"]` に変更 |
+| 結果が 0 件・特定エンジンだけ失敗     | 一時的な rate limit。`unresponsive_engines` を確認し、頻発するエンジンは settings.yml で無効化                                                                                 |
+| `searxng_search_suggestions` が空配列 | `search.autocomplete` が未設定（SearXNG デフォルトは無効）。同梱 settings.yml では `duckduckgo` で有効化済みのため、`git pull` 後に `docker compose restart searxng` で反映    |
+| コンテナが起動しない                  | `.env` の `SEARXNG_SECRET` 未設定。README のセットアップ手順 2 のコマンドで生成・追記する                                                                                      |
 
 ## 検証記録
 
