@@ -7,11 +7,15 @@
 # the supported rail: deterministic routing, session affinity, enable_stats
 # (GET /v1/routing/stats) and `serve --routing-log-file` all live here.
 #
-# Tier pair (decided 2026-07-23): strong = deepseek-v4-pro,
-# weak = deepseek-v4-flash. The weak target doubles as the routing
-# classifier (production-proven pattern that avoids the classifier
-# cost inversion). ${FIREWORKS_API_KEY} is expanded by the bundle
-# loader from the container environment (.env via docker compose).
+# Tier pair: strong = deepseek-v4-pro, weak = deepseek-v4-flash-0731.
+# The weak tier moved to the 0731 official release on 2026-08-03 —
+# identical serverless pricing to the preview build it supersedes, with
+# large agentic gains (Terminal Bench 61.8 -> 82.7, DeepSWE 7.3 -> 54.4,
+# Toolathlon 49.7 -> 70.3 on the vendor's published numbers). The weak
+# target doubles as the routing classifier (production-proven pattern
+# that avoids the classifier cost inversion). ${FIREWORKS_API_KEY} is
+# expanded by the bundle loader from the container environment (.env via
+# docker compose).
 
 defaults:
   api_key: ${FIREWORKS_API_KEY}
@@ -36,16 +40,19 @@ routes:
     classifier:
       # api_key / base_url cascade from defaults. Reasoning suppression:
       # the image patches the classifier's injected body to the
-      # Fireworks-compatible `reasoning_effort: "none"` (see Dockerfile) —
-      # classification runs ~1s instead of ~4-8s of chain-of-thought.
-      model: accounts/fireworks/models/deepseek-v4-flash
+      # Fireworks-compatible `reasoning_effort: "none"` (see Dockerfile).
+      # Measured on 0731 (2026-08-03): 61 completion tokens and no
+      # reasoning_content, versus 431 tokens and 1.5k characters of
+      # chain-of-thought without the knob — a ~7x token tax and ~3.4x
+      # wall-clock tax per classification if suppression stops working.
+      model: accounts/fireworks/models/deepseek-v4-flash-0731
       # Phase 2 tuning knobs: min_confidence (default 0.6) / fail_open
       # (default true) / recent_turn_window (default 4) /
       # max_request_chars / timeout_secs
     strong:
       model: accounts/fireworks/models/deepseek-v4-pro
     weak:
-      model: accounts/fireworks/models/deepseek-v4-flash
+      model: accounts/fireworks/models/deepseek-v4-flash-0731
     fallback_target_on_evict: strong
     # Pin the tier per conversation after 2 classified warmup turns
     # (measured 2026-07-23: cuts classifier calls ~3x on an agentic loop
@@ -63,4 +70,4 @@ routes:
 
   weak-only:
     type: model
-    target: accounts/fireworks/models/deepseek-v4-flash
+    target: accounts/fireworks/models/deepseek-v4-flash-0731
