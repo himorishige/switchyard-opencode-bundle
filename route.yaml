@@ -13,9 +13,10 @@
 # large agentic gains (Terminal Bench 61.8 -> 82.7, DeepSWE 7.3 -> 54.4,
 # Toolathlon 49.7 -> 70.3 on the vendor's published numbers). The weak
 # target doubles as the routing classifier (production-proven pattern
-# that avoids the classifier cost inversion). ${FIREWORKS_API_KEY} is
-# expanded by the bundle loader from the container environment (.env via
-# docker compose).
+# that avoids the classifier cost inversion). A third target, kimi-k3, is
+# published as the opt-in `k3-only` route and is not part of the routed
+# pair — see its comment below. ${FIREWORKS_API_KEY} is expanded by the
+# bundle loader from the container environment (.env via docker compose).
 
 defaults:
   api_key: ${FIREWORKS_API_KEY}
@@ -71,3 +72,20 @@ routes:
   weak-only:
     type: model
     target: accounts/fireworks/models/deepseek-v4-flash-0731
+
+  # Opt-in heavyweight, deliberately NOT wired into `auto`. Kimi K3 is a
+  # trade rather than a free upgrade: $3.00/$0.30/$15.00 per 1M against
+  # deepseek-v4-pro's $1.74/$0.145/$3.48, which measured as 7.1x the cost
+  # and 2.5x the wall clock on a planning/strategy set (2026-07-28) — the
+  # gap exceeds the 4.3x output-price ratio because K3 also thinks longer.
+  # Where it earns that: deep planning and open-ended design turns, which
+  # the coding_agent classifier cannot route to reliably (its features are
+  # all code-shaped, so business/architecture discussion reads as SIMPLE at
+  # high confidence). Pin this route by hand for those turns, or see
+  # "strong を K3 に差し替えるには" in the README to move the whole strong
+  # tier. Verified 2026-08-03: tool calling passes streamed and non-streamed
+  # (finish_reason=tool_calls, deltas reassemble), reasoning stays in
+  # reasoning_content with no <think> leakage into content.
+  k3-only:
+    type: model
+    target: accounts/fireworks/models/kimi-k3
