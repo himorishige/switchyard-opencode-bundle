@@ -7,11 +7,12 @@ opencode → Switchyard (127.0.0.1:4100) → Fireworks AI
               └─ classifier（weak が兼任）が難易度を判定して振り分け
 ```
 
-| route（opencode のモデル名） | 動作                                                         |
-| ---------------------------- | ------------------------------------------------------------ |
-| `auto`（既定）               | coding-agent 向け自動ルーティング。普段はこれだけで OK       |
-| `strong-only`                | deepseek-v4-pro 固定（ルーティングを疑ったときの切り分け用） |
-| `weak-only`                  | deepseek-v4-flash-0731 固定                                  |
+| route（opencode のモデル名） | 動作                                                                                            |
+| ---------------------------- | ----------------------------------------------------------------------------------------------- |
+| `auto`（既定）               | coding-agent 向け自動ルーティング。普段はこれだけで OK                                          |
+| `strong-only`                | deepseek-v4-pro 固定（ルーティングを疑ったときの切り分け用）                                    |
+| `weak-only`                  | deepseek-v4-flash-0731 固定                                                                     |
+| `k3-only`                    | Kimi K3 固定（オプトイン。深いプランニング・設計相談向け。[コスト注意](#k3-only-の使いどころ)） |
 
 設定は `route.yaml`（Switchyard の route-bundle 形式）1 枚です。
 
@@ -113,7 +114,8 @@ theme や他プロバイダなど独自の設定を足している場合は、�
     "models": {
       "auto": { "name": "auto — Switchyard routing" },
       "strong-only": { "name": "strong-only — deepseek-v4-pro pinned" },
-      "weak-only": { "name": "weak-only — deepseek-v4-flash-0731 pinned" }
+      "weak-only": { "name": "weak-only — deepseek-v4-flash-0731 pinned" },
+      "k3-only": { "name": "k3-only — kimi-k3 pinned (opt-in)" }
     }
   }
 },
@@ -126,14 +128,37 @@ theme や他プロバイダなど独自の設定を足している場合は、�
 - 既に `provider` キーがある場合は、その**中に** `switchyard` エントリだけを追加してください。`provider` ブロックごと貼り付けて置き換えると、既存のプロバイダ設定が消えます
 - strict-privacy 系のキー（`share` / `autoupdate` / `tools` / `permission` 等）とは衝突しません。そのまま共存できます
 - `model` / `small_model` を既に設定していて、いまの既定モデルを残したい場合は、この 2 行を取り込まず、使うときだけモデルピッカーから選択してください
-- マージ後に opencode を再起動し、モデルピッカーに `Switchyard (Fireworks auto-routing)` のモデル群（`auto` / `strong-only` / `weak-only`）が出ることを確認してください
+- マージ後に opencode を再起動し、モデルピッカーに `Switchyard (Fireworks auto-routing)` のモデル群（`auto` / `strong-only` / `weak-only` / `k3-only`）が出ることを確認してください
 
 ### 運用のポイント
 
-- モデル切替は opencode のモデルピッカーから `auto` / `strong-only` / `weak-only` を選択
+- モデル切替は opencode のモデルピッカーから `auto` / `strong-only` / `weak-only` / `k3-only` を選択
 - Switchyard を止めたいとき（障害切り分け等）は、opencode 側に Fireworks 直結のプロバイダ設定があれば、ピッカーから素の `fireworks-ai/...` モデルを選んで直結にフォールバックできます
 - `small_model` はタイトル生成などの補助コール用です。`weak-only` 固定にしてあります（auto に流すと小物が strong に化けることがあるため）
 - サブエージェントの扱い: 会話単位で classifier が個別に分類・ピン留めするため、軽いサブエージェントは自動で weak に落ちます。常に weak を強制したい場合は opencode の per-agent 設定（`"agent": {"<name>": {"model": "switchyard/weak-only"}}`）を使ってください
+
+### k3-only の使いどころ
+
+`k3-only` は **Kimi K3 を固定で使うオプトインのルート**です。`auto` の振り分け先には入っていません。
+
+自動ルーティングに載せていない理由は 2 つあります。
+
+1. **コスト差が大きい**。100 万トークンあたり K3 は $3.00 / $0.30 / $15.00（input / cached / output）、deepseek-v4-pro は $1.74 / $0.145 / $3.48 です。output の単価差は 4.3 倍ですが、K3 は思考も長いため、戦略・プランニング系の 6 問で測ったときの実コストは **約 7 倍**（レイテンシは約 2.5 倍）でした
+2. **classifier がこの領域を拾えない**。`coding_agent` プリセットの判定材料はコード作業の特徴量（変更範囲・ツール呼び出し数・コードベース文脈の要否）で構成されているため、コードを触らない設計相談や戦略の壁打ちは「単純」と判定されがちです。しかも誤る側ほど確信度が高く出るため、`min_confidence` を上げても救えません
+
+そのため、**深い設計相談・プランニングを始めるときに手動で選ぶ**運用を想定しています。コードを書くフェーズに戻ったら `auto` に戻してください。
+
+plan モードだけ K3 に固定したい場合は、opencode 側で per-agent に指定できます。
+
+```json
+"agent": {
+  "plan": { "model": "switchyard/k3-only" },
+  "explore": { "model": "switchyard/weak-only" },
+  "scout": { "model": "switchyard/weak-only" }
+}
+```
+
+`explore` / `scout` にも明示指定しているのは、**opencode のサブエージェントが呼び出し元のモデルを継承する**ためです。指定を省くと、grep 結果を読むだけのサブエージェントにも $15/1M の output 単価が乗ります。
 
 ## 運用
 
@@ -176,9 +201,30 @@ curl -s http://127.0.0.1:4100/health
 注意点は次のとおりです。
 
 - 使えるモデル ID は [Fireworks serverless カタログ](https://app.fireworks.ai/models?capability=serverless)で確認できます
-- opencode 側は route 名（`auto` / `strong-only` / `weak-only`）しか見ていないため、`opencode.json` の変更は不要です。モデルピッカーの表示名も実態に合わせたい場合は、`opencode.json` の `models` 配下の `name` を書き換えてください
+- opencode 側は route 名（`auto` / `strong-only` / `weak-only` / `k3-only`）しか見ていないため、`opencode.json` の変更は不要です。モデルピッカーの表示名も実態に合わせたい場合は、`opencode.json` の `models` 配下の `name` を書き換えてください
 - `classifier.model` を変更した場合は、変更後に 1 リクエスト流して動作確認してください。イメージに組み込んである思考抑制（`reasoning_effort: "none"`）は deepseek-v4-flash-0731 で受理を実測確認したもので、モデルによっては拒否される可能性があります
 - `defaults.extra_body: {}` は消さないでください（deepseek-v4 系ターゲット使用時の HTTP 400 回避。他モデルの場合も残して無害です）
+
+### strong を K3 に差し替えるには
+
+`k3-only` を都度選ぶのではなく、自動ルーティングの strong 側を丸ごと Kimi K3 にすることもできます。上と同じ 2 箇所を書き換えるだけです。
+
+```yaml
+# 1. routes.auto 配下
+strong:
+  model: accounts/fireworks/models/kimi-k3
+
+# 2. routes.strong-only 配下
+strong-only:
+  type: model
+  target: accounts/fireworks/models/kimi-k3
+```
+
+コスト影響を先に把握しておいてください。エージェントループの実測トークン分布に単価を当てた試算では、**1 run あたりの絶対額が約 3 倍**になります（strong 固定・auto ともに 3.0 倍）。weak との併用による削減率自体は −40% → −39% とほぼ変わらないため、「auto にすれば K3 の高単価が薄まる」という効果は期待できません。薄まるのではなく、**下限も上限も一緒に持ち上がる**と考えてください。
+
+また、コストの支配項が output に移ります（K3 は総額の約 68% が output、deepseek-v4-pro は約 47%）。長文の設計文書や大きなパッチを吐かせる使い方をするほど、試算より上振れします。
+
+まずは `k3-only` を手動で使って費用対効果を確かめ、それから差し替えを検討するのが安全です。
 
 ### 定期レビュー（ルーティング実績の回収）
 

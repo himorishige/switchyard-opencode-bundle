@@ -44,7 +44,10 @@
       "models": {
         "auto": { "name": "auto — Switchyard routing" },
         "strong-only": { "name": "strong-only — deepseek-v4-pro pinned" },
-        "weak-only": { "name": "weak-only — deepseek-v4-flash-0731 pinned" }
+        "weak-only": { "name": "weak-only — deepseek-v4-flash-0731 pinned" },
+        // オプトイン。深い設計相談・プランニング用に手動で選ぶ。
+        // コストは pro の約 7 倍（詳細は README「k3-only の使いどころ」）。
+        "k3-only": { "name": "k3-only — kimi-k3 pinned (opt-in)" }
       }
     }
   },
@@ -53,4 +56,15 @@
   "model": "switchyard/auto",
   // タイトル生成などの補助コールは weak 固定（auto だと strong に化けることがある）
   "small_model": "switchyard/weak-only"
+
+  // plan モードだけ K3 に固定したい場合は、次を追加する。
+  // explore / scout にも明示指定するのは、opencode のサブエージェントが
+  // 呼び出し元のモデルを継承するため（省くと grep 結果の読み取りにも
+  // $15/1M の output 単価が乗る）。
+  //
+  // ,"agent": {
+  //   "plan": { "model": "switchyard/k3-only" },
+  //   "explore": { "model": "switchyard/weak-only" },
+  //   "scout": { "model": "switchyard/weak-only" }
+  // }
 }
