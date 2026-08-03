@@ -11,7 +11,7 @@ opencode → Switchyard (127.0.0.1:4100) → Fireworks AI
 | ---------------------------- | ------------------------------------------------------------ |
 | `auto`（既定）               | coding-agent 向け自動ルーティング。普段はこれだけで OK       |
 | `strong-only`                | deepseek-v4-pro 固定（ルーティングを疑ったときの切り分け用） |
-| `weak-only`                  | deepseek-v4-flash 固定                                       |
+| `weak-only`                  | deepseek-v4-flash-0731 固定                                  |
 
 設定は `route.yaml`（Switchyard の route-bundle 形式）1 枚です。
 
@@ -113,7 +113,7 @@ theme や他プロバイダなど独自の設定を足している場合は、�
     "models": {
       "auto": { "name": "auto — Switchyard routing" },
       "strong-only": { "name": "strong-only — deepseek-v4-pro pinned" },
-      "weak-only": { "name": "weak-only — deepseek-v4-flash pinned" }
+      "weak-only": { "name": "weak-only — deepseek-v4-flash-0731 pinned" }
     }
   }
 },
@@ -145,6 +145,8 @@ theme や他プロバイダなど独自の設定を足している場合は、�
 | 死活確認               | `curl -s http://127.0.0.1:4100/health`                                                                     |
 | 停止                   | `docker compose down`                                                                                      |
 
+`route.yaml` だけが変わったリリース（tier の向き先変更など）では `git pull && docker compose restart` で足ります。イメージが変わっていなければ rebuild は不要です。
+
 ### モデルを変更するには
 
 tier の向き先は `route.yaml` の model 行で決まります。例として strong を deepseek-v4-pro から GLM-5.2 に切り替える場合、次の 2 箇所を書き換えます。
@@ -175,7 +177,7 @@ curl -s http://127.0.0.1:4100/health
 
 - 使えるモデル ID は [Fireworks serverless カタログ](https://app.fireworks.ai/models?capability=serverless)で確認できます
 - opencode 側は route 名（`auto` / `strong-only` / `weak-only`）しか見ていないため、`opencode.json` の変更は不要です。モデルピッカーの表示名も実態に合わせたい場合は、`opencode.json` の `models` 配下の `name` を書き換えてください
-- `classifier.model` を変更した場合は、変更後に 1 リクエスト流して動作確認してください。イメージに組み込んである思考抑制（`reasoning_effort: "none"`）は deepseek-v4-flash で受理を実測確認したもので、モデルによっては拒否される可能性があります
+- `classifier.model` を変更した場合は、変更後に 1 リクエスト流して動作確認してください。イメージに組み込んである思考抑制（`reasoning_effort: "none"`）は deepseek-v4-flash-0731 で受理を実測確認したもので、モデルによっては拒否される可能性があります
 - `defaults.extra_body: {}` は消さないでください（deepseek-v4 系ターゲット使用時の HTTP 400 回避。他モデルの場合も残して無害です）
 
 ### 定期レビュー（ルーティング実績の回収）
@@ -195,7 +197,7 @@ curl -s http://127.0.0.1:4100/health
 | 集計スナップショット      | `curl -s http://127.0.0.1:4100/v1/routing/stats \| python3 -m json.tool` | モデル別リクエスト数・トークン数の累計（**コンテナ再起動でリセット**）        |
 | per-request ログ（JSONL） | `docker cp switchyard-opencode:/app/logs/routing.jsonl ./routing.jsonl`  | 1 リクエスト 1 行（選択 tier・モデル・トークン。named volume 永続で耐久記録） |
 
-**使用量・コストの正**: [Fireworks ダッシュボード](https://app.fireworks.ai/)のモデル別使用量を見てください。strong（deepseek-v4-pro）と weak（deepseek-v4-flash）は別モデルなので、**モデル別使用量がそのまま tier 分布 × コスト**です。これが削減効果レポートの材料になります。上の stats はルーティング内訳の分析用です。
+**使用量・コストの正**: [Fireworks ダッシュボード](https://app.fireworks.ai/)のモデル別使用量を見てください。strong（deepseek-v4-pro）と weak（deepseek-v4-flash-0731）は別モデルなので、**モデル別使用量がそのまま tier 分布 × コスト**です。これが削減効果レポートの材料になります。上の stats はルーティング内訳の分析用です。
 
 ## セキュリティノート
 
@@ -210,6 +212,8 @@ curl -s http://127.0.0.1:4100/health
 - `route.yaml` は Switchyard の **route-bundle 形式**（`switchyard --routing-profiles route.yaml serve`）。旧 v2 profile config（`serve --config` + `serve.py` アダプタ）は上流 PR #119 で撤去予定のため移行済み
 - イメージは git main の commit SHA ピン（Dockerfile の `SWITCHYARD_SHA`）。PyPI v0.1.0 は streaming usage 修正（PR #64）未収載のため使わない
 - classifier の思考抑制は `request_processor.py` への sed パッチで実現（vLLM 語彙 `chat_template_kwargs` → Fireworks 互換の `reasoning_effort: "none"` に置換。2026-07-23 実測: 判定 18/18 一致・2.7〜4.2 倍高速）。deterministic 型に `disable_reasoning` ノブが無いための措置で、上流には「抑制語彙のプロバイダ対応」を issue 候補として持つ
+- weak tier は 2026-08-03 に deepseek-v4-flash-0731（preview 版を置き換える公式リリース）へ更新。同一価格で agentic 系ベンチが大きく伸びており、classifier としても抑制ノブが効く（実測: `reasoning_effort: "none"` 受理・completion 61 tokens 固定・reasoning_content 空。ノブ無しでは 431 tokens / 1.5k 字の思考が出る）。0731 のモデルカードは `reasoning_effort` を low/high/max としか書いていないが、`"none"` は実測で受理される。代替ノブとして `thinking: {"type": "disabled"}` も同じ結果になることを確認済み
+- Dockerfile のパッチ検証 assert が参照するモデル ID は `model_accepts_reasoning_hint()`（プロバイダタグ判定）の入力であり、tier に指定した実モデルの版番号とは独立。tier を差し替えても Dockerfile を触る必要はなく、利用者側の更新も rebuild なしで済む
 - 注意: 上流 PR #123（fireworks を deny リストに追加）がマージされた SHA に上げると auto-detect が False になり注入自体が止まる（安全だが思考が復活して低速化）。SHA を上げる際は本パッチとの整合を再確認すること
 - `session_affinity: true` + `affinity_warmup_turns: 2` を既定化（2026-07-23 実測: classifier 呼び出し −56%・classifier prompt tokens −55%・ピン後の切替ゼロ）。ピン後は tool-planning エスカレーションも効かなくなる点は既知のトレードオフ（fail-open 判定はピンされないため、低確信のまま固定されることはない）
 - 上流の profile-level `subagent_target`（#112）は components-v2 専用 + ヘッダー検知（opencode は非発火）のため不採用。サブエージェント対応は opencode 側設定で足りる

@@ -44,7 +44,7 @@
       "models": {
         "auto": { "name": "auto — Switchyard routing" },
         "strong-only": { "name": "strong-only — deepseek-v4-pro pinned" },
-        "weak-only": { "name": "weak-only — deepseek-v4-flash pinned" }
+        "weak-only": { "name": "weak-only — deepseek-v4-flash-0731 pinned" }
       }
     }
   },
