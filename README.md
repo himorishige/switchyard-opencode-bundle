@@ -16,6 +16,8 @@ opencode → Switchyard (127.0.0.1:4100) → Fireworks AI
 
 設定は `route.yaml`（Switchyard の route-bundle 形式）1 枚です。
 
+> 初めてセットアップする場合は、[docs/onboarding.md](docs/onboarding.md)（初回セットアップの一本道手順）から始めるのがおすすめです。
+
 ## 前提
 
 - Docker（Docker Desktop / colima 等）
