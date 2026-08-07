@@ -7,15 +7,23 @@
 # the supported rail: deterministic routing, session affinity, enable_stats
 # (GET /v1/routing/stats) and `serve --routing-log-file` all live here.
 #
-# Tier pair: strong = deepseek-v4-pro, weak = deepseek-v4-flash-0731.
+# Tier pair: strong = kimi-k3, weak = deepseek-v4-flash-0731.
+# The strong tier moved from deepseek-v4-pro to Kimi K3 on 2026-08-07.
+# K3 is a deliberate trade, not a free upgrade: $3.00/$0.30/$15.00 per 1M
+# against pro's $1.74/$0.145/$3.48 — about 3x the absolute cost on the
+# measured token mix — bought for stronger deep-planning and open-ended
+# design turns. The relative saving of `auto` vs strong-only stays
+# roughly unchanged, because routing works the price ladder rather than
+# the absolute price. To revert, point the two kimi-k3 lines below back
+# to accounts/fireworks/models/deepseek-v4-pro and restart.
 # The weak tier moved to the 0731 official release on 2026-08-03 —
 # identical serverless pricing to the preview build it supersedes, with
 # large agentic gains (Terminal Bench 61.8 -> 82.7, DeepSWE 7.3 -> 54.4,
 # Toolathlon 49.7 -> 70.3 on the vendor's published numbers). The weak
 # target doubles as the routing classifier (production-proven pattern
-# that avoids the classifier cost inversion). A third target, kimi-k3, is
-# published as the opt-in `k3-only` route and is not part of the routed
-# pair — see its comment below. ${FIREWORKS_API_KEY} is expanded by the
+# that avoids the classifier cost inversion). `k3-only` is now a
+# deprecated alias of strong-only — see its comment below.
+# ${FIREWORKS_API_KEY} is expanded by the
 # bundle loader from the container environment (.env via docker compose).
 
 defaults:
@@ -51,7 +59,7 @@ routes:
       # (default true) / recent_turn_window (default 4) /
       # max_request_chars / timeout_secs
     strong:
-      model: accounts/fireworks/models/deepseek-v4-pro
+      model: accounts/fireworks/models/kimi-k3
     weak:
       model: accounts/fireworks/models/deepseek-v4-flash-0731
     fallback_target_on_evict: strong
@@ -67,25 +75,20 @@ routes:
   # Escape hatches: pin a single tier from the opencode model picker.
   strong-only:
     type: model
-    target: accounts/fireworks/models/deepseek-v4-pro
+    target: accounts/fireworks/models/kimi-k3
 
   weak-only:
     type: model
     target: accounts/fireworks/models/deepseek-v4-flash-0731
 
-  # Opt-in heavyweight, deliberately NOT wired into `auto`. Kimi K3 is a
-  # trade rather than a free upgrade: $3.00/$0.30/$15.00 per 1M against
-  # deepseek-v4-pro's $1.74/$0.145/$3.48, which measured as 7.1x the cost
-  # and 2.5x the wall clock on a planning/strategy set (2026-07-28) — the
-  # gap exceeds the 4.3x output-price ratio because K3 also thinks longer.
-  # Where it earns that: deep planning and open-ended design turns, which
-  # the coding_agent classifier cannot route to reliably (its features are
-  # all code-shaped, so business/architecture discussion reads as SIMPLE at
-  # high confidence). Pin this route by hand for those turns, or see
-  # "strong を K3 に差し替えるには" in the README to move the whole strong
-  # tier. Verified 2026-08-03: tool calling passes streamed and non-streamed
-  # (finish_reason=tool_calls, deltas reassemble), reasoning stays in
-  # reasoning_content with no <think> leakage into content.
+  # Deprecated alias — same target as strong-only since the 2026-08-07
+  # strong=K3 cutover (it was the opt-in K3 route before that). Kept
+  # because opencode raises UnknownError for model ids that vanish from a
+  # provider config; drop it from your opencode.json before removing it
+  # here. K3 behaviour on this route was verified 2026-08-03: tool calling
+  # passes streamed and non-streamed (finish_reason=tool_calls, deltas
+  # reassemble), reasoning stays in reasoning_content with no <think>
+  # leakage into content.
   k3-only:
     type: model
     target: accounts/fireworks/models/kimi-k3
