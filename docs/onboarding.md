@@ -13,7 +13,7 @@
 | 3   | シェル環境変数（strict-privacy） | 本ドキュメント                                         | 3 分      |
 | 4   | Global AGENTS.md 配置            | 本ドキュメント                                         | 2 分      |
 | 5   | Agent Plugin（team-ai-kb）導入   | README「Agent Plugin」                                 | 5 分      |
-| 6   | web 検索キー                     | [web-search-onboarding.md](./web-search-onboarding.md) | 15 分     |
+| 6   | web 検索キー                     | [web-search-onboarding.md](./web-search-onboarding.md) | 5〜15 分  |
 | 7   | 動作確認チェックリスト           | 本ドキュメント                                         | 5 分      |
 
 手順 3・4 はルーターと独立しているので、手順 1 のビルド待ちの間に済ませるのがおすすめです。
@@ -83,8 +83,10 @@ README「Agent Plugin（rag-kb / web-search）」の「初期設定（共通・�
 
 ## 6. web 検索キー
 
-[web-search-onboarding.md](./web-search-onboarding.md)（15 分）に従ってください。
-**課金有効の GCP プロジェクトで発行したキーを使う**点だけは飛ばさずに読んでください（学習不使用の条件です）。
+[web-search-onboarding.md](./web-search-onboarding.md) に従ってください。
+バックエンドは **Gemini（推奨・無料枠あり・15 分）/ OpenAI（代替・5 分）** のどちらか一方で動きます。
+学習不使用の条件だけは飛ばさずに読んでください——Gemini は**課金有効の GCP プロジェクトで
+発行したキーが必須**（free tier は学習利用される）、OpenAI は API 既定で学習不使用です。
 
 ## 7. 動作確認チェックリスト
 
@@ -95,7 +97,7 @@ README「Agent Plugin（rag-kb / web-search）」の「初期設定（共通・�
 | opencode   | `opencode run -m switchyard/auto "こんにちは"` | 応答が返る                               |
 | AGENTS.md  | `ls ~/.config/opencode/AGENTS.md`              | ファイルが存在する                       |
 | 環境変数   | `env \| grep OPENCODE_`                        | 手順 3 の値が並ぶ                        |
-| web 検索   | web-search-onboarding.md の手順 5              | 回答 + `Sources:` + 統計行               |
+| web 検索   | web-search-onboarding.md の動作確認            | 回答 + `Sources:` + 統計行               |
 
 - 長時間アイドル後の初回コールはコールドスタートで数十秒かかることがあります（2 回目からは数秒）。
   疎通確認のコマンドには `--max-time` を付けると原因の切り分けが楽になります
