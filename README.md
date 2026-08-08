@@ -348,6 +348,10 @@ One improvement over the previous setup: the classifier's own calls now appear i
 
 **The source of truth for usage and cost** is per-model usage on the [Fireworks dashboard](https://app.fireworks.ai/). Since strong (kimi-k3) and weak (deepseek-v4-flash-0731) are different models, **per-model usage is exactly your tier distribution multiplied by cost** — that is what a savings report is built from. The stats above are for analyzing the routing breakdown.
 
+## Experimental
+
+- [`experimental/permission-judge/`](experimental/permission-judge/) — an opencode plugin that adds a Claude Code-style "smart auto mode": an LLM judge (via the router's weak tier) classifies permission requests and only safe ones are auto-approved. Ships in shadow mode (judge and log only, humans still decide) until calibration proves agreement
+
 ## Security notes
 
 - The listener binds to **127.0.0.1 only**. Nothing is exposed to the LAN
