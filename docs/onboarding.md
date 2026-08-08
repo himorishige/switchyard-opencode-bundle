@@ -1,103 +1,111 @@
-# チームオンボーディング（初回セットアップの一本道、45〜60 分想定）
+# Team onboarding (one linear path, 45–60 minutes)
 
-新しくチーム環境に参加するメンバーが、ルーター起動から web 検索まで一通り揃えるための手順です。
-各ステップの詳細は README と各ドキュメントにあり、ここでは順番と漏れやすいポイントだけをまとめます。
-所要時間の大半はイメージビルドと GCP まわりの待ち時間です。
+**English** | [日本語](onboarding.ja.md)
 
-## 全体像
+This is the path a new team member follows to get everything in place, from starting the router to
+running a web search. The details of each step live in the [README](../README.md) and the other
+documents; what this page adds is the order, and the points people miss.
+Most of the elapsed time is waiting — for the image build and for GCP.
 
-| #   | ステップ                         | 参照先                                                 | 目安      |
-| --- | -------------------------------- | ------------------------------------------------------ | --------- |
-| 1   | ルーター起動                     | README「セットアップ」                                 | 15〜20 分 |
-| 2   | opencode Global 設定             | README「opencode 側の設定」                            | 5 分      |
-| 3   | シェル環境変数（strict-privacy） | 本ドキュメント                                         | 3 分      |
-| 4   | Global AGENTS.md 配置            | 本ドキュメント                                         | 2 分      |
-| 5   | Agent Plugin（team-ai-kb）導入   | README「Agent Plugin」                                 | 5 分      |
-| 6   | web 検索キー                     | [web-search-onboarding.md](./web-search-onboarding.md) | 5〜15 分  |
-| 7   | 動作確認チェックリスト           | 本ドキュメント                                         | 5 分      |
+## Overview
 
-手順 3・4 はルーターと独立しているので、手順 1 のビルド待ちの間に済ませるのがおすすめです。
+| #   | Step                                         | Where                                                  | Time      |
+| --- | -------------------------------------------- | ------------------------------------------------------ | --------- |
+| 1   | Start the router                             | README, "Setup"                                        | 15–20 min |
+| 2   | opencode global config                       | README, "Configuring opencode"                         | 5 min     |
+| 3   | Shell environment variables (strict-privacy) | This document                                          | 3 min     |
+| 4   | Place a global AGENTS.md                     | This document                                          | 2 min     |
+| 5   | Agent Plugin (team-ai-kb)                    | README, "Agent Plugin"                                 | 5 min     |
+| 6   | Web search key                               | [web-search-onboarding.md](./web-search-onboarding.md) | 5–15 min  |
+| 7   | Verification checklist                       | This document                                          | 5 min     |
 
-## 1. ルーター起動
+Steps 3 and 4 are independent of the router, so the image build in step 1 is a good time to do them.
 
-README「セットアップ」1〜4 のとおりです。要点は次の 3 つです。
+## 1. Start the router
 
-- `FIREWORKS_API_KEY` を `.env` に配置します（git 管理外・`chmod 600`。キーの発行・取得はチームの案内に従ってください）
-- `docker compose up -d --build`（初回はビルドに時間がかかります）
-- `curl -s http://127.0.0.1:4100/health` が `{"status":"ok"}` を返せば OK
+Follow steps 1–4 of "Setup" in the README. Three things matter:
 
-## 2. opencode Global 設定
+- Put `FIREWORKS_API_KEY` in `.env` (outside git, `chmod 600`; follow your team's instructions for
+  obtaining the key)
+- `docker compose up -d --build` (the first build takes a while)
+- `curl -s http://127.0.0.1:4100/health` returning `{"status":"ok"}` means you are done
 
-README「opencode 側の設定」の A（そのまま上書き）/ B（既存カスタム設定へマージ）どちらかで
-`~/.config/opencode/opencode.json` を設定します。
+## 2. opencode global config
 
-- 必ず **Global スコープ**（`~/.config/opencode/`）に置きます。プロジェクト側の opencode.json は
-  Global を上書きするため、プライバシー設定が抜け落ちる原因になります
-- `.json` と `.jsonc` を両方置かないでください（どちらか一方のみ）
+Set up `~/.config/opencode/opencode.json` using either path A (overwrite with the bundled config) or
+path B (merge into your existing config) from "Configuring opencode" in the README.
 
-## 3. シェル環境変数（strict-privacy）
+- It must go in the **global scope** (`~/.config/opencode/`). A project-level opencode.json overrides
+  the global one, which is how privacy settings quietly go missing
+- Do not keep both `.json` and `.jsonc` — pick one
 
-設定ファイル（手順 2）に含まれるのは config 側だけです。環境変数側の無効化フラグは
-各自のシェル rc（`~/.zshrc` 等）に設定します。
+## 3. Shell environment variables (strict-privacy)
+
+Step 2 covers only the config-file half of strict-privacy. The environment-variable half goes into
+your own shell rc (`~/.zshrc` or similar).
 
 ```sh
-# opencode-with-strict-privacy 推奨の環境変数
-export OPENCODE_ENABLE_EXA=0             # Exa 検索を無効化
-export OPENCODE_EXPERIMENTAL=0           # 実験機能を一括無効化
-export OPENCODE_EXPERIMENTAL_EXA=0       # 旧 Exa フラグ（レガシー）
-export OPENCODE_AUTO_SHARE=0             # 自動共有を無効化
-export OPENCODE_DISABLE_LSP_DOWNLOAD=1   # 任意: LSP 自動ダウンロード停止
-export OPENCODE_DISABLE_MODELS_FETCH=1   # 任意: モデルカタログ取得停止
+# environment variables recommended by opencode-with-strict-privacy
+export OPENCODE_ENABLE_EXA=0             # disable Exa search
+export OPENCODE_EXPERIMENTAL=0           # disable experimental features wholesale
+export OPENCODE_EXPERIMENTAL_EXA=0       # legacy Exa flag
+export OPENCODE_AUTO_SHARE=0             # disable automatic sharing
+export OPENCODE_DISABLE_LSP_DOWNLOAD=1   # optional: stop automatic LSP downloads
+export OPENCODE_DISABLE_MODELS_FETCH=1   # optional: stop model catalog fetches
 ```
 
-出典: [opencode-with-strict-privacy](https://github.com/cm-dyoshikawa/opencode-with-strict-privacy/blob/main/README.ja.md)（設定ファイル側とあわせた全体像の説明があります）
+Source: [opencode-with-strict-privacy](https://github.com/cm-dyoshikawa/opencode-with-strict-privacy),
+which explains these together with the config-file side.
 
-設定後は `source ~/.zshrc`、または新しいターミナルで反映してください。
+Run `source ~/.zshrc` afterwards, or open a new terminal.
 
-## 4. Global AGENTS.md を置く（見落としやすい・重要）
+## 4. Place a global AGENTS.md (easy to miss, and important)
 
-opencode は Global の `~/.config/opencode/AGENTS.md` が**存在しない場合、`~/.claude/CLAUDE.md` を
-互換フォールバックとしてグローバルルールに読み込みます**（公式仕様）。Claude Code を併用している人は、
-個人設定・メモの内容がそのまま全リクエストと一緒に送信されることになります。
+When a global `~/.config/opencode/AGENTS.md` **does not exist, opencode falls back to reading
+`~/.claude/CLAUDE.md` as its global rules** — this is documented behavior. If you also use Claude Code,
+that means your personal settings and notes get sent along with every request.
 
-対処は Global AGENTS.md を置いてフォールバックを止めるだけです。
+The fix is simply to place a global AGENTS.md, which stops the fallback.
 
 ```sh
 mkdir -p ~/.config/opencode
 cat > ~/.config/opencode/AGENTS.md <<'EOF'
 # Global rules
 
-- web 検索クエリには顧客名・社内プロジェクト名・未公開のコード名を含めない
+- Never put customer names, internal project names, or unreleased code names into web search queries
 EOF
 ```
 
-- すでに自分の AGENTS.md を運用している場合はそのままで問題ありません（フォールバックは「無い場合」だけ発動します）
-- 内容は最小で構いません。上の 1 行はチーム推奨のクエリ規律です
+- If you already maintain your own AGENTS.md, you are fine — the fallback only fires when the file is absent
+- The content can be minimal. The line above is the team's recommended query discipline
 
-## 5. Agent Plugin（team-ai-kb）
+## 5. Agent Plugin (team-ai-kb)
 
-README「Agent Plugin（rag-kb / web-search）」の「初期設定（共通・初回のみ）」を済ませてから、
-使っているクライアント（opencode / Claude Code / Codex CLI）の節に進んでください。
+Complete "First-time setup (all clients)" under "Agent Plugin (rag-kb / web-search)" in the README,
+then continue to the section for your client (opencode / Claude Code / Codex CLI).
 
-- `mcp.json.example → mcp.json` のコピー後に書き換える接続先アドレスは、チームの案内を参照してください
+- For the endpoint address you fill in after copying `mcp.json.example` to `mcp.json`, follow your
+  team's instructions
 
-## 6. web 検索キー
+## 6. Web search key
 
-[web-search-onboarding.md](./web-search-onboarding.md) に従ってください。
-バックエンドは **Gemini（推奨・無料枠あり・15 分）/ OpenAI（代替・5 分）** のどちらか一方で動きます。
-学習不使用の条件だけは飛ばさずに読んでください——Gemini は**課金有効の GCP プロジェクトで
-発行したキーが必須**（free tier は学習利用される）、OpenAI は API 既定で学習不使用です。
+Follow [web-search-onboarding.md](./web-search-onboarding.md).
+Either backend works on its own: **Gemini (recommended, has a free tier, 15 min) or OpenAI
+(alternative, 5 min)**. Do not skip the part about exclusion from training — for Gemini, the key
+**must be issued from a billing-enabled GCP project** (free-tier keys are used for training); for
+OpenAI, the API excludes your data from training by default.
 
-## 7. 動作確認チェックリスト
+## 7. Verification checklist
 
-| 確認       | コマンド                                       | 期待する結果                             |
-| ---------- | ---------------------------------------------- | ---------------------------------------- |
-| ルーター   | `curl -s http://127.0.0.1:4100/health`         | `{"status":"ok"}`                        |
-| ルート一覧 | `curl -s http://127.0.0.1:4100/v1/models`      | auto / strong-only / weak-only / k3-only |
-| opencode   | `opencode run -m switchyard/auto "こんにちは"` | 応答が返る                               |
-| AGENTS.md  | `ls ~/.config/opencode/AGENTS.md`              | ファイルが存在する                       |
-| 環境変数   | `env \| grep OPENCODE_`                        | 手順 3 の値が並ぶ                        |
-| web 検索   | web-search-onboarding.md の動作確認            | 回答 + `Sources:` + 統計行               |
+| Check                 | Command                                           | Expected                                 |
+| --------------------- | ------------------------------------------------- | ---------------------------------------- |
+| Router                | `curl -s http://127.0.0.1:4100/health`            | `{"status":"ok"}`                        |
+| Route list            | `curl -s http://127.0.0.1:4100/v1/models`         | auto / strong-only / weak-only / k3-only |
+| opencode              | `opencode run -m switchyard/auto "hello"`         | a response comes back                    |
+| AGENTS.md             | `ls ~/.config/opencode/AGENTS.md`                 | the file exists                          |
+| Environment variables | `env \| grep OPENCODE_`                           | the values from step 3                   |
+| Web search            | the verification step in web-search-onboarding.md | an answer, `Sources:`, and a stats line  |
 
-- 長時間アイドル後の初回コールはコールドスタートで数十秒かかることがあります（2 回目からは数秒）。
-  疎通確認のコマンドには `--max-time` を付けると原因の切り分けが楽になります
+- After a long idle period the first call can take tens of seconds because of a cold start (a few
+  seconds from the second call onward). Adding `--max-time` to your connectivity checks makes it
+  easier to tell the two apart

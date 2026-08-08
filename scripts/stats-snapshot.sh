@@ -50,4 +50,4 @@ PY
 echo
 echo "Saved: $STATS_FILE"
 echo "       $LOG_FILE"
-echo "Next : submit both files as designated by your project (README「定期レビュー」参照)"
+echo "Next : submit both files as designated by your project (see README, \"Periodic review\")"

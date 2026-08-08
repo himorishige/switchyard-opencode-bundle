@@ -2,6 +2,6 @@
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "team-ai-kb",
   "version": "0.1.0",
-  "description": "チーム AI 環境の agent-facing 層: ナレッジ検索 (rag-kb + nvidia-rag MCP) と web 検索 (web-search skill)",
+  "description": "Agent-facing layer of the team AI environment: knowledge base search (rag-kb + nvidia-rag MCP) and web search (web-search skill)",
   "license": "Apache-2.0"
 }

@@ -1,52 +1,56 @@
 ---
 name: web-search
 description: >
-  Gemini（Google Search grounding）または OpenAI（web search）による web 検索。出典つきの回答を返す。
-  Use when: 最新情報・公開情報を web で調べたい / 「web で検索して」「ググって」と言われた /
-  ローカルナレッジ（rag-kb）にない一般知識・最新リリース・価格・仕様を確認したい。
-  Trigger keywords: web検索, 検索して, ググって, 調べて, web search, 最新情報, リリース情報
+  Grounded web search through Gemini (Google Search grounding) or OpenAI (web search).
+  Returns an answer with its sources.
+  Use when: you need current or public information from the web / the user asks you to
+  "search the web" or "google it" / you need general knowledge, a recent release, a price
+  or a spec that the local knowledge base (rag-kb) does not cover.
+  Trigger keywords: web search, search the web, google it, look it up, latest, release info,
+  web検索, 検索して, ググって, 調べて, 最新情報, リリース情報
 ---
 
-# web-search — grounded web 検索（Gemini / OpenAI）
+# web-search — grounded web search (Gemini / OpenAI)
 
-各自の API キーで検索バックエンド（Gemini または OpenAI）を直接呼ぶ。
-中間サーバなし。クエリは自分の端末から選んだバックエンド 1 社にのみ送信される。
+Calls a search backend (Gemini or OpenAI) directly with the user's own API key.
+No intermediary server: the query goes from this machine to exactly one backend provider.
 
-## 実行方法
+## How to run it
 
-この skill の `scripts/search.py` を質問文つきで実行します（stdlib のみ、依存なし）。
+Run this skill's `scripts/search.py` with the question as its argument (stdlib only, no dependencies).
 
 ```bash
-uv run <この skill のディレクトリ>/scripts/search.py "質問文"
-# uv がなければ python3 でも可
+uv run <this skill's directory>/scripts/search.py "your question"
+# python3 works too if uv is unavailable
 ```
 
-出力 = grounded な回答本文 + `Sources:`（出典 URL）+ 使用統計 1 行
-（`-- provider=... model=... executed_queries=... tokens=...`）。
+Output = the grounded answer, then `Sources:` (source URLs), then one line of usage stats
+(`-- provider=... model=... executed_queries=... tokens=...`).
 
-## 前提（初回のみ）
+## Prerequisites (once)
 
-- 環境変数のキーが **どちらか一方** 必要。バックエンドはキーから自動判別される
-  （両方ある場合は Gemini 優先。`WEB_SEARCH_PROVIDER=gemini|openai` で明示切替）
-  - `GEMINI_API_KEY`（推奨・無料枠あり）: **必ず課金有効の GCP プロジェクトで発行したキー**を使う
-    （free tier キーはクエリが Google の学習に使われる）
-  - `OPENAI_API_KEY`（代替・無料枠なし）: API 既定で学習不使用。追加条件なし
-  - 手順 = 配布リポジトリの `docs/web-search-onboarding.md`
-- モデル既定は Gemini = `gemini-3.6-flash` / OpenAI = `gpt-5-mini`。
-  `WEB_SEARCH_MODEL` 環境変数で上書き可
+- **One** of these API keys must be in the environment. The backend is selected from whichever key
+  is present (Gemini wins if both are; override with `WEB_SEARCH_PROVIDER=gemini|openai`)
+  - `GEMINI_API_KEY` (recommended, has a free tier): the key **must be issued from a
+    billing-enabled GCP project** — queries made with a free-tier key are used to train Google's models
+  - `OPENAI_API_KEY` (alternative, no free tier): excluded from training by default on the API, no
+    extra conditions
+  - Setup instructions: `docs/web-search-onboarding.md` in the distribution repository
+- Default models are `gemini-3.6-flash` for Gemini and `gpt-5-mini` for OpenAI.
+  Override with the `WEB_SEARCH_MODEL` environment variable
 
-## クエリ規律（必須）
+## Query discipline (required)
 
-- **機密語をクエリに入れない**（顧客名・社内コードネーム・未公開の内部情報・シークレット類）。
-  一般語に言い換えてから検索する
-- 質問は文のまま渡してよい（キーワード分解より文の方が grounding が効く）
-- 回答には `Sources:` の出典を添えて引用する。出典が空の回答は「未確認情報」として扱う
+- **Never put confidential terms in a query** — customer names, internal code names, unreleased
+  internal information, secrets. Rephrase into general terms before searching
+- Pass the question as a sentence (grounding works better on sentences than on decomposed keywords)
+- Cite the `Sources:` entries when you use the answer. Treat an answer with no sources as unverified
 
-## コストマナー
+## Cost manners
 
-- Gemini の課金は「実行された検索クエリごと」で、1 回の呼び出しで 1〜3 クエリ走る
-  （出力の統計行で見える）。無料枠は各自の GCP プロジェクトごとに月 5,000 クエリ。
-  OpenAI は無料枠なしの従量（≈$0.012/検索）
-- **同じ質問の言い換えリトライを機械的に繰り返さない**（2 回試して駄目なら質問を変えるか、
-  ソースを直接 fetch する）
-- ローカルナレッジで足りる話題（チームの検証記録・過去記事）は rag-kb を先に使う
+- Gemini bills **per executed search query**, and one call runs 1–3 of them (visible in the stats
+  line). The free tier is 5,000 queries per month per GCP project.
+  OpenAI has no free tier and costs roughly $0.012 per search
+- **Do not mechanically retry the same question with reworded queries.** After two attempts, change
+  the question or fetch the source directly
+- For topics the local knowledge base covers (team verification records, past articles), use rag-kb first

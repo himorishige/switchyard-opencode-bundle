@@ -1,53 +1,58 @@
 ---
 name: rag-kb
 description: >
-  チーム共通ナレッジ検索（NVIDIA RAG Blueprint）を MCP 経由で使うためのガイド。
-  Use when: 社内ナレッジ・検証記録・公開記事の内容を調べたい / 「ナレッジで調べて」
-  「RAG で検索して」と言われた / 過去の検証結果や記事の数字を確認したい。
-  Trigger keywords: ナレッジ, RAG, 検索して, knowledge base, rag-kb, 社内ドキュメント,
-  記事を調べて, コレクション
+  Guide to searching the shared team knowledge base (NVIDIA RAG Blueprint) over MCP.
+  Use when: you need something from internal knowledge, verification records or published
+  articles / the user asks you to "check the knowledge base" or "search the RAG" /
+  you need to confirm a number from a past experiment or article.
+  Trigger keywords: knowledge base, RAG, rag-kb, internal docs, collection, search the knowledge,
+  ナレッジ, RAG で検索, 社内ドキュメント, 記事を調べて, コレクション
 ---
 
-# rag-kb — チーム共通ナレッジ検索の使い方
+# rag-kb — using the shared knowledge base
 
-チームの RAG 基盤（NVIDIA RAG Blueprint）を `nvidia-rag` MCP サーバ経由で使う。
-公開されている tools は読み取り 5 本のみ: `search` / `generate` / `get_summary` /
-`list_collections` / `get_documents`。書き込み・削除はこの面からはできない（管理者専用）。
+Access the team's RAG stack (NVIDIA RAG Blueprint) through the `nvidia-rag` MCP server.
+Only five read-only tools are exposed: `search`, `generate`, `get_summary`,
+`list_collections`, `get_documents`. Writes and deletes are not reachable from this surface
+(administrators only).
 
-## いつどの tool を使うか
+## Which tool to use when
 
-| やりたいこと                                     | tool               | 備考                                                           |
-| ------------------------------------------------ | ------------------ | -------------------------------------------------------------- |
-| 関連チャンクを見て自分で判断したい（推奨・既定） | `search`           | 軽量・高速。`reranker_top_k: 4` 程度から                       |
-| ナレッジに基づく回答文が欲しい                   | `generate`         | RAG パイプライン全体（rewriter/rerank/生成）が動く。遅い・重い |
-| どんなコレクションがあるか知る                   | `list_collections` | まずこれで台帳確認                                             |
-| コレクション内のファイル一覧                     | `get_documents`    |                                                                |
+| Goal                                                     | Tool               | Notes                                                                   |
+| -------------------------------------------------------- | ------------------ | ----------------------------------------------------------------------- |
+| See the relevant chunks and judge for yourself (default) | `search`           | Light and fast. Start around `reranker_top_k: 4`                        |
+| Get a written answer grounded in the knowledge base      | `generate`         | Runs the whole RAG pipeline (rewriter, rerank, generation). Slow, heavy |
+| Find out which collections exist                         | `list_collections` | Check the catalog here first                                            |
+| List the files inside a collection                       | `get_documents`    |                                                                         |
 
-**原則: まず `search`。** エージェントである君自身が最終回答を組み立てるなら、
-`generate` の LLM を待つより `search` のチャンクを直接読むほうが速く、文脈も濁らない。
-`generate` は「引用つきの回答文そのもの」が成果物のときだけ使う。
+**Rule of thumb: reach for `search` first.** If you — the agent — are going to compose the final
+answer anyway, reading chunks from `search` is faster than waiting on `generate`'s LLM, and it keeps
+your context cleaner. Use `generate` only when the deliverable is the cited answer text itself.
 
-## 使い方の型
+## The usual shape
 
-1. `list_collections` でコレクションを確認（名前は台帳参照）
-2. `search` に **質問文そのまま**を渡す（キーワード分解しない。埋め込みは文で最も効く。
-   日本語 query で英語文書も引ける——言語をまたぐ検索は普通に機能する）
-3. `collection_names` は必ず明示する（省略すると意図しないコレクションを見にいく）
-4. ヒットの `document_name` と `score` を確認。score 0.5 未満しかなければ
-   「該当なし」と judged して、無理に引用しない
-5. 回答には出典（`document_name`）を添える
+1. Confirm the collections with `list_collections` (names come from the catalog)
+2. Pass the **question as-is** to `search` — do not decompose it into keywords. Embeddings work best
+   on sentences, and a Japanese query retrieves English documents just fine; cross-language search
+   works normally
+3. Always specify `collection_names` explicitly (omitting it searches collections you did not intend)
+4. Check `document_name` and `score` on the hits. If nothing scores above 0.5, judge it "no match"
+   rather than forcing a citation
+5. Cite the source (`document_name`) in your answer
 
-## マナー・制約
+## Manners and constraints
 
-- 検索 1 回ごとに共有の埋め込み API（40 リクエスト/分・チーム共有）を 1 消費する。
-  **同じ質問の言い換えリトライを機械的に繰り返さない**（3 回試して駄目なら質問を変える）
-- 応答内の `[image content removed by MCP adapter]` は、表・ページ画像が
-  アダプタ層で除去された印。画像そのものが必要なときは Web UI で同じ質問をする
-- 接続先や不調時の連絡先は、配布リポジトリ README の「Agent Plugin」章を参照
+- Every search consumes one request against the shared embedding API (40 requests/minute, shared by
+  the team). **Do not mechanically retry the same question with reworded queries** — after three
+  attempts, change the question
+- `[image content removed by MCP adapter]` in a response marks a table or page image that the adapter
+  layer stripped. When you actually need the image, ask the same question in the web UI
+- For the endpoint address, or who to contact when it misbehaves, see the "Agent Plugin" section of
+  the distribution repository README
 
-## コレクション台帳（管理者が更新）
+## Collection catalog (maintained by administrators)
 
-| コレクション         | 内容                        | 更新 |
-| -------------------- | --------------------------- | ---- |
-| （例）devio-articles | チーム公開記事のアーカイブ  | 週次 |
-| （例）nvidia-docs    | NVIDIA 公式ドキュメント抜粋 | 随時 |
+| Collection               | Contents                                    | Updated   |
+| ------------------------ | ------------------------------------------- | --------- |
+| (example) devio-articles | Archive of the team's published articles    | Weekly    |
+| (example) nvidia-docs    | Excerpts from NVIDIA official documentation | As needed |
