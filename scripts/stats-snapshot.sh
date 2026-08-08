@@ -3,12 +3,12 @@
 #
 # Collects two files from the running switchyard-opencode container into
 # ./stats-out/ and prints a per-route summary:
-#   - stats-<user>-<stamp>.json    aggregate GET /v1/routing/stats
+#   - stats-<user>-<stamp>.json    aggregate GET /v1/stats (native server)
 #   - routing-<user>-<stamp>.jsonl per-request log (tier, model, tokens;
 #                                  no prompt bodies)
 #
-# Note: /v1/routing/stats counters reset on container restart; the JSONL
-# lives in the switchyard-logs named volume and survives restarts and
+# Note: /v1/stats counters reset on container restart; the JSONL lives in
+# the switchyard-logs named volume and survives restarts and
 # `up -d --force-recreate`, so the JSONL is the durable record.
 set -euo pipefail
 
@@ -21,7 +21,7 @@ mkdir -p "$OUT_DIR"
 STATS_FILE="$OUT_DIR/stats-$TAG-$STAMP.json"
 LOG_FILE="$OUT_DIR/routing-$TAG-$STAMP.jsonl"
 
-curl -sf http://127.0.0.1:4100/v1/routing/stats > "$STATS_FILE"
+curl -sf http://127.0.0.1:4100/v1/stats > "$STATS_FILE"
 docker cp -q switchyard-opencode:/app/logs/routing.jsonl "$LOG_FILE"
 
 python3 - "$LOG_FILE" <<'PY'
@@ -32,8 +32,9 @@ from collections import Counter
 reqs, toks = Counter(), Counter()
 for line in open(sys.argv[1]):
     r = json.loads(line)
-    # Auto-routed lines carry tier=strong/weak; tier-pinned routes
-    # (strong-only / weak-only) log an empty tier, so label by model.
+    # Auto-routed lines carry tier=strong/weak, the judge's own calls log
+    # tier=classifier (newly visible on the native server), and tier-pinned
+    # routes (strong-only / weak-only) log an empty tier -> label by model.
     key = r.get("tier") or "pinned:" + r["model"].rsplit("/", 1)[-1]
     reqs[key] += 1
     toks[key] += r.get("total_tokens", 0)

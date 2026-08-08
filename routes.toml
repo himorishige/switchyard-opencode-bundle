@@ -1,0 +1,89 @@
+# Switchyard native (Rust) server config.
+# Successor of route.yaml (route-bundle `type: deterministic`, removed upstream in #268).
+# Route ids are unchanged from the legacy bundle, so opencode configs need no change:
+#   auto / strong-only / weak-only / k3-only
+# After editing, validate before restart:
+#   docker compose run --rm switchyard --config /app/routes.toml --dry-run
+
+schema_version = 1
+
+[llm_clients.fireworks]
+format = "openai_chat"
+base_url = "https://api.fireworks.ai/inference/v1"
+api_key_env = "FIREWORKS_API_KEY"
+
+# Separate client for the judge: the server dedupes targets by (llm_client, model id)
+# and would silently drop either the classifier or the weak target otherwise (they
+# share deepseek-v4-flash-0731 but differ in extra_body). A distinct client name keeps
+# both, and matches the upstream advice to give the classifier its own client/quota.
+[llm_clients.fireworks_judge]
+format = "openai_chat"
+base_url = "https://api.fireworks.ai/inference/v1"
+api_key_env = "FIREWORKS_API_KEY"
+
+# Classifier = weak-tier model doubling as judge (same pattern as the legacy bundle).
+# extra_body replaces the legacy image sed patch: the Rust judge does not inherit the
+# client's reasoning params, so thinking suppression is declared here, per target.
+# Fireworks accepts reasoning_effort: "none" (measured 2026-07-23 / 2026-08-03).
+[targets.classifier]
+id = "accounts/fireworks/models/deepseek-v4-flash-0731"
+llm_client = "fireworks_judge"
+# temperature = 0: the Rust judge sends no temperature (provider default), which
+# made 2/10 near-threshold verdicts flip across reruns in the M2 variance probe.
+extra_body = { reasoning_effort = "none", temperature = 0 }
+
+[targets.strong]
+id = "accounts/fireworks/models/kimi-k3"
+llm_client = "fireworks"
+
+[targets.weak]
+id = "accounts/fireworks/models/deepseek-v4-flash-0731"
+llm_client = "fireworks"
+
+[routes.auto]
+id = "auto"
+type = "llm_classifier"
+mode = "capability"
+classifier_target = "classifier"
+strong_target = "strong"
+weak_target = "weak"
+# Calibrated from the measured p_solve distribution (M2, 87 judgments, 2026-08-08):
+# 0.75 keeps all quality-verified bench/production-shape cases on weak (30/30 + 10/10)
+# while deep business sparring reaches strong 12/13 (9/13 at the 0.5 default).
+# Effective thresholds: supported 0.75 / uncertain・unmatched 0.85 / unsupported 0.95.
+base_threshold = 0.75
+threshold_step = 0.1
+session_affinity = true
+message_hash_fallback = true
+
+# Opt-in: evidence-based escalation. Every session starts on the weak tier; a
+# trajectory judge watches for a clear pattern of trouble (repeated identical
+# failures, false progress) and latches the session to strong after 2
+# consecutive escalate verdicts. Trade-offs vs `auto`: responses are buffered
+# (not truly streamed) until the latch, the confirming turn pays both tiers,
+# and the latch is one-way per session. See README "Evidence-based escalation".
+[routes.auto-esc]
+id = "auto-esc"
+type = "llm_classifier"
+mode = "escalation"
+classifier_target = "classifier"
+strong_target = "strong"
+weak_target = "weak"
+escalation = { confirmations = 2 }
+
+[routes.strong-only]
+id = "strong-only"
+type = "passthrough"
+target = "strong"
+
+[routes.weak-only]
+id = "weak-only"
+type = "passthrough"
+target = "weak"
+
+# Deprecated alias of strong-only. Kept because opencode raises UnknownError for
+# model ids that disappear from provider config; remove only after team configs drop it.
+[routes.k3-only]
+id = "k3-only"
+type = "passthrough"
+target = "strong"

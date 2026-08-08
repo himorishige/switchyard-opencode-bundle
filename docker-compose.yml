@@ -12,20 +12,17 @@ services:
     env_file:
       - .env
     volumes:
-      - ./route.yaml:/app/route.yaml:ro
+      - ./routes.toml:/app/routes.toml:ro
       # Named volume (not a bind mount — avoids host-permission surprises)
       # so the routing JSONL survives `up -d --force-recreate` (key
       # rotation) and image rebuilds. Retrieve it with `docker cp` /
-      # scripts/stats-snapshot.sh, or read the aggregate at
-      # GET /v1/routing/stats.
+      # scripts/stats-snapshot.sh, or read the aggregate at GET /v1/stats.
       - switchyard-logs:/app/logs
     # Adds the per-request routing JSONL on top of the image CMD.
     command:
       [
-        'switchyard',
-        '--routing-profiles',
-        '/app/route.yaml',
-        'serve',
+        '--config',
+        '/app/routes.toml',
         '--host',
         '0.0.0.0',
         '--port',
@@ -35,13 +32,7 @@ services:
       ]
     restart: unless-stopped
     healthcheck:
-      test:
-        [
-          'CMD',
-          'python',
-          '-c',
-          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4100/health', timeout=3)",
-        ]
+      test: ['CMD', 'curl', '-fsS', 'http://127.0.0.1:4100/health']
       interval: 30s
       timeout: 5s
       retries: 3
