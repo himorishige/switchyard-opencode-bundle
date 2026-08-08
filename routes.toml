@@ -22,15 +22,21 @@ base_url = "https://api.fireworks.ai/inference/v1"
 api_key_env = "FIREWORKS_API_KEY"
 
 # Classifier = weak-tier model doubling as judge (same pattern as the legacy bundle).
-# extra_body replaces the legacy image sed patch: the Rust judge does not inherit the
-# client's reasoning params, so thinking suppression is declared here, per target.
-# Fireworks accepts reasoning_effort: "none" (measured 2026-07-23 / 2026-08-03).
+#
+# Deliberately NO extra_body here. The server routes serving calls through a
+# per-route map keyed by MODEL ID (build_client_router), so when classifier and
+# weak share a model id, one backend silently serves both. With thinking
+# suppression declared here, weak-tier USER responses were generated with
+# reasoning_effort "none" + temperature 0 (verified 2026-08-08, minimal repro in
+# bugfix-extrabody-leak/). Keeping this target parameter-identical to weak makes
+# the collision harmless. Trade-off: the judge now thinks at provider defaults
+# (~200-600 completion tokens, a few seconds per judgment; session affinity keeps
+# it to session starts) and near-threshold verdicts can flip across reruns
+# (2/10 in the M2 variance probe). Recalibration check 2026-08-08: 87 judgments,
+# production shapes 40/40 weak unchanged at base_threshold 0.75.
 [targets.classifier]
 id = "accounts/fireworks/models/deepseek-v4-flash-0731"
 llm_client = "fireworks_judge"
-# temperature = 0: the Rust judge sends no temperature (provider default), which
-# made 2/10 near-threshold verdicts flip across reruns in the M2 variance probe.
-extra_body = { reasoning_effort = "none", temperature = 0 }
 
 [targets.strong]
 id = "accounts/fireworks/models/kimi-k3"

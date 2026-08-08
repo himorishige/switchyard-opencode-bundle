@@ -313,8 +313,8 @@ curl -s http://127.0.0.1:4100/health
 
 - 使えるモデル ID は [Fireworks serverless カタログ](https://app.fireworks.ai/models?capability=serverless)で確認できます
 - opencode 側は route 名（`auto` / `strong-only` / `weak-only` / `k3-only`）しか見ていないため、向き先を変えるだけなら `opencode.json` の変更は不要です。モデルピッカーの表示名も実態に合わせたい場合は、`opencode.json` の `models` 配下の `name` を書き換えてください。route 名そのものを増やした場合は `models` への登録が別途必要です
-- classifier target のモデルを変更した場合は、変更後に 1 リクエスト流して judge の健全性を確認してください（`curl -s http://127.0.0.1:4100/v1/stats` → `classifier`）。classifier target の思考抑制（`extra_body = { reasoning_effort = "none", temperature = 0 }`）は deepseek-v4-flash-0731 で実測確認したもので、モデルによっては拒否・無視されます。judge の回答が素の `content` の外（reasoning 領域）に出るようになると、全判定が fail-open で strong に倒れます
-- **サーバーは (llm_client, model id) の組で target を重複排除し、重複した片方を黙って落とします。** classifier target が同じ接続先なのに専用の `[llm_clients.fireworks_judge]` を使っているのはこのためです（weak tier と同一モデルだが `extra_body` が違う）。classifier を tier と同じモデルに向ける場合は、この client 分離を維持してください
+- classifier target のモデルを変更した場合は、変更後に 1 リクエスト流して judge の健全性を確認してください（`curl -s http://127.0.0.1:4100/v1/stats` → `classifier`）。judge はプロバイダ既定パラメータで動きます（`extra_body` なし——次項参照）。judge の回答が素の `content` の外（reasoning 領域）に出るようになると、全判定が fail-open で strong に倒れます
+- **モデル ID 衝突の罠は 2 層あります。** サーバーは (llm_client, model id) の組で target を重複排除し、重複した片方を黙って落とします——classifier target が専用の `[llm_clients.fireworks_judge]` を使っているのはこのためです。これとは別に、サービング呼び出しは **route ごとのモデル ID のみをキーとするマップ**で解決されるため、tier と同一モデルの classifier target は tier と**パラメータ完全一致**である必要があります。ここに `extra_body` を置くと、その tier のユーザー応答にも黙って適用されます（2026-08-08 実測——judge 用の思考抑制が weak tier の回答に適用されていました）
 
 ### 定期レビュー（ルーティング実績の回収）
 
@@ -352,7 +352,7 @@ curl -s http://127.0.0.1:4100/health
 
 - ルーターは **standalone のネイティブ Rust サーバー**（`switchyard-server --config routes.toml`）。上流 #268（2026-08-07）が Python のルーティング実装を削除したため、route-bundle 形式（`type: deterministic`）から移行した。これまでのレール（v2 profile config → route-bundle）はどちらも main から消えている。旧 `route.yaml` は作業リポジトリの `legacy-routebundle/` に参照用として保存
 - イメージは git main の commit SHA ピン（Dockerfile の `SWITCHYARD_SHA`）。#268 以降のリリースがまだ存在しないため——crates.io に `switchyard-server` は未公開・PyPI は 0.1.0 止まり・`v0.2.0` タグは #268 前に main から分岐——SHA ピンが唯一の選択肢。#268 込みのタグが出たらそちらへ切替（release CI が crates を publish したら `cargo install` ベースへの簡素化も検討）。TOML は未知キーを拒否するので、SHA を上げる際は必ず `switchyard-server --config routes.toml --dry-run` で検証してから配布する
-- **ソースパッチは廃止。** 旧イメージは Python classifier に `reasoning_effort: "none"` を sed で注入していたが、ネイティブ judge は抑制を素の設定として受ける——classifier target の `extra_body` がそれ。隣の `temperature = 0` は、judge が温度を送らない（= プロバイダ既定で走る）仕様への対策で、閾値際の判定が再実行で揺れる実測（較正プローブで 2/10 フリップ）に基づく
+- **judge の思考抑制は廃止。** 以前は classifier target に `extra_body = { reasoning_effort = "none", temperature = 0 }` を置いていたが、上記のモデル ID 衝突により weak tier のユーザー応答へパラメータが漏れるため、judge はプロバイダ既定で動かす形に変更（2026-08-08）。代償は判定あたり数百思考トークンと数秒のレイテンシ（session affinity により判定はセッション開始時に限られる）、および閾値際の判定の揺れ（分散プローブで 2/10 フリップ）。再較正チェック（87 判定）で `base_threshold = 0.75` は据え置きを確認済み
 - ルーティングは `llm_classifier` の **capability モード**: judge が `p_solve`（weak tier がタスクを完遂する確率）を推定し、`base_threshold`（+ capability boundary 段階ごとの `threshold_step`）と比較する。現行の閾値（0.75/0.1）は 2026-08-08 に実エージェント transcript 由来の 87 判定セットで較正したもの（既定 0.5 では深い設計議論が weak に漏れる: 9/13 → 0.75 で 12/13）。調整する場合は勘で動かさず、自分の p_solve 分布を測ってから
 - judge が読むのは会話の **最初と最新の user メッセージだけ**（既定では assistant / tool ターンは不可視）。旧特徴量抽出 rubric よりセッション中盤の判定が安定しているのはこのためで、較正の主役はプロンプトではなく閾値になる
 - schema 検証に失敗した判定や、素の `content` の外に出た回答は **strong に fail-open** する。`/metrics` の `switchyard_classifier_fail_open_total` を監視面に
