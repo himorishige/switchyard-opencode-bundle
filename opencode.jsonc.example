@@ -43,11 +43,11 @@
       },
       "models": {
         "auto": { "name": "auto — Switchyard routing" },
-        "strong-only": { "name": "strong-only — deepseek-v4-pro pinned" },
+        "strong-only": { "name": "strong-only — kimi-k3 pinned" },
         "weak-only": { "name": "weak-only — deepseek-v4-flash-0731 pinned" },
-        // オプトイン。深い設計相談・プランニング用に手動で選ぶ。
-        // コストは pro の約 7 倍（詳細は README「k3-only の使いどころ」）。
-        "k3-only": { "name": "k3-only — kimi-k3 pinned (opt-in)" }
+        // 2026-08-07 の strong=K3 切替以降は strong-only と同じ接続先。
+        // 旧設定の参照を壊さないための別名として残している。
+        "k3-only": { "name": "k3-only — kimi-k3 pinned (alias of strong-only)" }
       }
     }
   },
@@ -55,16 +55,18 @@
   // 既定モデル = 自動ルーティング
   "model": "switchyard/auto",
   // タイトル生成などの補助コールは weak 固定（auto だと strong に化けることがある）
-  "small_model": "switchyard/weak-only"
+  "small_model": "switchyard/weak-only",
 
-  // plan モードだけ K3 に固定したい場合は、次を追加する。
-  // explore / scout にも明示指定するのは、opencode のサブエージェントが
-  // 呼び出し元のモデルを継承するため（省くと grep 結果の読み取りにも
-  // $15/1M の output 単価が乗る）。
-  //
-  // ,"agent": {
-  //   "plan": { "model": "switchyard/k3-only" },
-  //   "explore": { "model": "switchyard/weak-only" },
-  //   "scout": { "model": "switchyard/weak-only" }
-  // }
+  // strong=K3（output $15/1M）への切替に伴い、agent 単位の固定を既定有効にした。
+  // - plan: strong（Kimi K3）直結。coding_agent の classifier はコード軸の
+  //   特徴量のため、非コードの深い議論を高確信で SIMPLE と誤判定することが
+  //   あり、壁打ちの品質を classifier に賭けない
+  // - explore / scout: サブエージェントは呼び出し元のモデルを継承するため、
+  //   weak を明示して継承を断つ。省くと grep 結果の読み取りのような
+  //   単純作業にも K3 の output 単価が乗る
+  "agent": {
+    "plan": { "model": "switchyard/strong-only" },
+    "explore": { "model": "switchyard/weak-only" },
+    "scout": { "model": "switchyard/weak-only" }
+  }
 }
