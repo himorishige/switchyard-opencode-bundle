@@ -9,14 +9,15 @@ opencode → Switchyard (127.0.0.1:4100) → Fireworks AI
               └─ a classifier (the weak model does double duty) rates difficulty and picks the tier
 ```
 
-| Route (model name in opencode) | Behavior                                                                                                        |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| `auto` (default)               | Automatic routing tuned for coding agents. This is all you need day to day                                      |
-| `strong-only`                  | Pinned to kimi-k3 (useful when you suspect routing is the problem)                                              |
-| `weak-only`                    | Pinned to deepseek-v4-flash-0731                                                                                |
-| `k3-only`                      | Alias of `strong-only` (the old opt-in route from before K3 became strong). [Why](#the-strong-tier-and-kimi-k3) |
+| Route (model name in opencode) | Behavior                                                                                                                  |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| `auto` (default)               | Automatic routing tuned for coding agents. This is all you need day to day                                                |
+| `auto-esc` (opt-in)            | Weak-first; a trajectory judge escalates to strong on real trouble. [Details](#evidence-based-escalation-auto-esc-opt-in) |
+| `strong-only`                  | Pinned to kimi-k3 (useful when you suspect routing is the problem)                                                        |
+| `weak-only`                    | Pinned to deepseek-v4-flash-0731                                                                                          |
+| `k3-only`                      | Alias of `strong-only` (the old opt-in route from before K3 became strong). [Why](#the-strong-tier-and-kimi-k3)           |
 
-Everything is configured in a single file, `route.yaml` (Switchyard's route-bundle format).
+Everything is configured in a single file, `routes.toml` (the config format of Switchyard's native Rust server).
 
 > Setting this up for the first time? Start from [docs/onboarding.md](docs/onboarding.md), a single linear path through the whole setup.
 
@@ -50,7 +51,7 @@ Open `.env` and replace `FIREWORKS_API_KEY` with your own key.
 docker compose up -d --build
 ```
 
-The first build takes a few minutes because Switchyard's Rust extension is compiled from source.
+The first build compiles Switchyard's native Rust server from source and takes roughly 10–20 minutes depending on your machine. Later builds reuse the Docker layer cache and finish in seconds unless the pinned Switchyard version changed.
 
 Outside Docker Desktop — on colima, for example — the `docker compose` subcommand may not be installed. In that case, install the standalone compose binary:
 
@@ -66,7 +67,7 @@ Only if you want to keep the `docker compose` subcommand syntax, add the followi
 "cliPluginsExtraDirs": ["/opt/homebrew/lib/docker/cli-plugins"]
 ```
 
-You can also start the container without compose. `route.yaml` is baked into the image; only log persistence and the healthcheck are compose-only.
+You can also start the container without compose. `routes.toml` is baked into the image; only log persistence and the healthcheck are compose-only.
 
 ```bash
 docker build -t switchyard-opencode .
@@ -81,7 +82,7 @@ curl -s http://127.0.0.1:4100/health
 # → {"status":"ok"}
 
 curl -s http://127.0.0.1:4100/v1/models | head
-# → auto / strong-only / weak-only / k3-only
+# → auto / auto-esc / strong-only / weak-only / k3-only
 ```
 
 Once that works, move on to configuring opencode.
@@ -117,6 +118,7 @@ If you have your own settings — a theme, other providers — do not overwrite.
     },
     "models": {
       "auto": { "name": "auto — Switchyard routing" },
+      "auto-esc": { "name": "auto-esc — weak-first, escalates on trouble" },
       "strong-only": { "name": "strong-only — kimi-k3 pinned" },
       "weak-only": { "name": "weak-only — deepseek-v4-flash-0731 pinned" },
       "k3-only": { "name": "k3-only — kimi-k3 pinned (alias of strong-only)" }
@@ -138,11 +140,11 @@ A few things to watch out for when merging:
 - The strict-privacy keys (`share`, `autoupdate`, `tools`, `permission`, …) do not conflict with any of this. They coexist as-is
 - If you already set `model` / `small_model` and want to keep your current default, skip those two lines and pick the route from the model picker when you need it
 - For the reasoning behind the `agent` block (plan wired straight to strong, explore / scout pinned to weak), see [Agent-level pinning](#agent-level-pinning-plan-mode-enabled-by-default)
-- Restart opencode after merging, and confirm that the model picker lists `Switchyard (Fireworks auto-routing)` with its four routes (`auto`, `strong-only`, `weak-only`, `k3-only`)
+- Restart opencode after merging, and confirm that the model picker lists `Switchyard (Fireworks auto-routing)` with its five routes (`auto`, `auto-esc`, `strong-only`, `weak-only`, `k3-only`)
 
 ### Day-to-day notes
 
-- Switch routes from opencode's model picker (`/models`). The four routes appear under the provider `Switchyard (Fireworks auto-routing)`
+- Switch routes from opencode's model picker (`/models`). The five routes appear under the provider `Switchyard (Fireworks auto-routing)`
 - If you need to take Switchyard out of the loop (to isolate a problem, say), keep a direct Fireworks provider entry in your opencode config — then you can fall back by picking a plain `fireworks-ai/...` model from the picker
 - `small_model` is used for auxiliary calls such as title generation. It is pinned to `weak-only`, because routing those through `auto` occasionally sends trivial work to the strong tier
 - Subagents: the classifier rates and pins each conversation independently, so lightweight subagents drop to weak on their own. To force weak unconditionally, use opencode's per-agent setting (`"agent": {"<name>": {"model": "switchyard/weak-only"}}`)
@@ -157,9 +159,9 @@ The dominant cost term shifts to output: about 68% of the total for K3 versus ab
 
 #### Agent-level pinning (plan mode, enabled by default)
 
-The `coding_agent` preset decides using features of code work — how much changes, how many tool calls, whether codebase context is needed. Design discussions and strategy sessions that touch no code therefore tend to read as "simple". Worse, the misjudgments come back with _higher_ confidence than the correct ones, so raising `min_confidence` does not rescue them.
+The classifier estimates whether the weak tier can complete the task. Its capability rubric is written around coding work, so business and design discussions match none of its rules and fall through to a stricter routing threshold — in our calibration set that catches most deep discussions (12 of 13), but not all, and the verdict is still a judgment call made per conversation.
 
-That is why `opencode.jsonc.example` enables per-agent pinning **by default** (the `agent` key sits at the top level, alongside `provider` and `model`; when merging into an existing config, add the individual entries inside it).
+That is why `opencode.jsonc.example` enables per-agent pinning **by default** (the `agent` key sits at the top level, alongside `provider` and `model`; when merging into an existing config, add the individual entries inside it). Plan mode is where deep discussions live, and pinning it makes the behavior deterministic instead of probabilistic.
 
 ```json
 "agent": {
@@ -174,15 +176,18 @@ That is why `opencode.jsonc.example` enables per-agent pinning **by default** (t
 #### Updating an existing router
 
 ```bash
-git pull && docker compose restart
+git pull && docker compose up -d --build
 curl -s http://127.0.0.1:4100/health   # {"status":"ok"}
 ```
+
+`--build` matters when a release changes the Dockerfile or the pinned Switchyard version (the 2026-08 native-server migration is one of those — coming from the old `route.yaml` setup, a rebuild is required; your routing log survives in the `switchyard-logs` volume). For releases that only touch `routes.toml`, `git pull && docker compose restart` is enough.
 
 Route names do not change, so editing `opencode.json` is not required. Update it only if you want the model picker labels to match reality:
 
 ```json
 "models": {
   "auto": { "name": "auto — Switchyard routing" },
+  "auto-esc": { "name": "auto-esc — weak-first, escalates on trouble" },
   "strong-only": { "name": "strong-only — kimi-k3 pinned" },
   "weak-only": { "name": "weak-only — deepseek-v4-flash-0731 pinned" },
   "k3-only": { "name": "k3-only — kimi-k3 pinned (alias of strong-only)" }
@@ -193,18 +198,26 @@ Restart opencode after saving; config is read only at startup, so a long-running
 
 #### Reverting to the previous strong tier (deepseek-v4-pro)
 
-If the new tier does not suit you, revert these two places in `route.yaml` and restart.
+If the new tier does not suit you, the strong target is defined once in `routes.toml`, so it is a one-line change followed by a restart. Both `auto` and `strong-only` (plus the `k3-only` alias) follow it.
 
-```yaml
-# 1. under routes.auto
-strong:
-  model: accounts/fireworks/models/deepseek-v4-pro
-
-# 2. under routes.strong-only
-strong-only:
-  type: model
-  target: accounts/fireworks/models/deepseek-v4-pro
+```toml
+[targets.strong]
+id = "accounts/fireworks/models/deepseek-v4-pro"
 ```
+
+### Evidence-based escalation (auto-esc, opt-in)
+
+`auto-esc` inverts the routing philosophy of `auto`. Instead of predicting difficulty before each turn, every session **starts on the weak tier**, and a trajectory judge reads the session after each turn looking for a clear pattern of real trouble — the same error repeating with unrelated edits in between, claimed success contradicted by test output, drift away from the task. Two consecutive escalate verdicts latch the session to strong for good.
+
+Measured behavior (2026-08-08): healthy friction (a failing test being worked on, sequential alternatives) never escalated; a genuinely stuck trajectory latched to strong on turn 2 and stayed there with zero further judge calls (p50 latency ~1s once latched).
+
+Trade-offs to know before picking it:
+
+- **Streaming is buffered until the latch.** The judge must read the weak tier's completed reply before it is released, so responses arrive all at once instead of token by token. Short and mid-length replies feel similar (the weak model's own thinking already delays first tokens); long generations will visibly pause, then appear in full
+- The turn that confirms escalation pays both tiers (the weak attempt is discarded and the turn re-runs on strong)
+- The latch is one-way per session — there is no de-escalation back to weak
+
+Where it shines: cost-minimal experiments (weak share is structurally maximal), and **non-interactive workloads** — cron jobs, batch pipelines, agents nobody watches live — where buffered streaming costs nothing and evidence-based escalation is exactly the failure insurance you want. To try it, pick `auto-esc` in the model picker; it is registered in `opencode.jsonc.example`.
 
 ## Agent Plugin (rag-kb / web-search)
 
@@ -271,32 +284,22 @@ The skills are symlinked, so `git pull` is enough. When a release changes `mcp.j
 | Task                    | Command                                                                                                               |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | Update (config + image) | `git pull && docker compose up -d --build`                                                                            |
-| Config-only change      | edit `route.yaml`, then `docker compose restart` (compose bind-mounts it, so no rebuild)                              |
+| Config-only change      | edit `routes.toml`, then `docker compose restart` (compose bind-mounts it, so no rebuild)                             |
 | Key rotation            | update `.env`, then `docker compose up -d --force-recreate` (`restart` reuses the env captured at container creation) |
 | Health check            | `curl -s http://127.0.0.1:4100/health`                                                                                |
 | Stop                    | `docker compose down`                                                                                                 |
 
-For releases that only change `route.yaml` (retargeting a tier, say), `git pull && docker compose restart` is enough. No rebuild is needed unless the image changed.
+For releases that only change `routes.toml` (retargeting a tier, say), `git pull && docker compose restart` is enough. No rebuild is needed unless the image changed.
 
 For releases that **add** a route, also register the new route name under `provider.switchyard.models` in your global config (`~/.config/opencode/opencode.json`). Updating the router alone will not make it appear in the model picker — see [Updating an existing router](#updating-an-existing-router).
 
 ### Changing models
 
-Each tier's target is set by a model line in `route.yaml`. To switch strong from kimi-k3 to GLM-5.2, for example, edit two places.
+Each tier is a `[targets.<name>]` table in `routes.toml`, referenced by the routes. To switch strong from kimi-k3 to GLM-5.2, for example, edit one line:
 
-The first is under `routes.auto` (where automatic routing sends strong traffic):
-
-```yaml
-strong:
-  model: accounts/fireworks/models/glm-5p2
-```
-
-The second is under `routes.strong-only` (change the pinned route to match):
-
-```yaml
-strong-only:
-  type: model
-  target: accounts/fireworks/models/glm-5p2
+```toml
+[targets.strong]
+id = "accounts/fireworks/models/glm-5p2"
 ```
 
 A restart applies the change — no rebuild, thanks to the bind mount.
@@ -310,8 +313,8 @@ Things to keep in mind:
 
 - Valid model IDs are listed in the [Fireworks serverless catalog](https://app.fireworks.ai/models?capability=serverless)
 - opencode only sees route names (`auto`, `strong-only`, `weak-only`, `k3-only`), so retargeting a tier needs no change to `opencode.json`. Update the `name` fields under `models` only if you want the picker labels to match. Adding a brand-new route name does require registering it under `models`
-- If you change `classifier.model`, send one request afterwards to confirm it still works. The reasoning suppression baked into the image (`reasoning_effort: "none"`) was verified against deepseek-v4-flash-0731; other models may reject it
-- Do not remove `defaults.extra_body: {}` — it prevents an HTTP 400 when a deepseek-v4 target is in play, and it is harmless with other models
+- If you change the classifier target's model, send one request afterwards and check judge health (`curl -s http://127.0.0.1:4100/v1/stats` → `classifier`). The thinking suppression on the classifier target (`extra_body = { reasoning_effort = "none", temperature = 0 }`) was verified against deepseek-v4-flash-0731; other models may reject or ignore it — if the judge's answer ends up outside plain `content`, every verdict fails open to strong
+- **The server dedupes targets by (llm_client, model id) and silently drops one of the duplicates.** That is why the classifier target uses its own `[llm_clients.fireworks_judge]` entry even though it points at the same endpoint: it shares a model with the weak tier but needs different `extra_body`. Keep that split if you retarget the classifier onto a model a tier also uses
 
 ### Periodic review (collecting routing stats)
 
@@ -325,17 +328,20 @@ It saves an aggregate JSON plus the per-request log (JSONL) into `stats-out/`, s
 
 To look at the raw surfaces yourself:
 
-| Surface                 | Command                                                                  | Contents                                                                              |
-| ----------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
-| Aggregate snapshot      | `curl -s http://127.0.0.1:4100/v1/routing/stats \| python3 -m json.tool` | Cumulative request and token counts per model (**reset when the container restarts**) |
-| Per-request log (JSONL) | `docker cp switchyard-opencode:/app/logs/routing.jsonl ./routing.jsonl`  | One line per request (selected tier, model, tokens). Durable via the named volume     |
+| Surface                 | Command                                                                 | Contents                                                                                         |
+| ----------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Aggregate snapshot      | `curl -s http://127.0.0.1:4100/v1/stats \| python3 -m json.tool`        | Cumulative request/token counts per model and tier, plus judge health (**reset on restart**)     |
+| Per-request log (JSONL) | `docker cp switchyard-opencode:/app/logs/routing.jsonl ./routing.jsonl` | One line per request (selected tier, model, tokens). Durable via the named volume                |
+| Prometheus metrics      | `curl -s http://127.0.0.1:4100/metrics`                                 | Includes `switchyard_classifier_fail_open_total` — worth an occasional glance for judge failures |
+
+One improvement over the previous setup: the classifier's own calls now appear in the JSONL with `tier="classifier"`, so the routing overhead cost — invisible before — shows up in the weekly summary as its own row.
 
 **The source of truth for usage and cost** is per-model usage on the [Fireworks dashboard](https://app.fireworks.ai/). Since strong (kimi-k3) and weak (deepseek-v4-flash-0731) are different models, **per-model usage is exactly your tier distribution multiplied by cost** — that is what a savings report is built from. The stats above are for analyzing the routing breakdown.
 
 ## Security notes
 
 - The listener binds to **127.0.0.1 only**. Nothing is exposed to the LAN
-- Switchyard's Intake sink (its request-collection mechanism) stays **disabled** — `--intake-enabled` is never passed. The only place request bodies go is the Fireworks endpoint you configured
+- The native Rust server has **no request-collection mechanism** (the old Python CLI's Intake sink does not exist here). The only place request bodies go is the Fireworks endpoint you configured
 - The routing log (`/app/logs/routing.jsonl`) stays inside a Docker named volume (`switchyard-logs`). It reaches the host only when you pull it out with `stats-snapshot.sh` or `docker cp`. It contains routing decisions and token counts, never prompt bodies
 - Web-search safeguards (disabling exa.ai) are outside this router's scope. If you want to limit what leaves through web search, apply them on the opencode side first (see [Requirements](#requirements))
 - Queries from the web-search skill go directly to the Gemini API (Google) under your own key. Their exclusion from training **requires a key issued from a billing-enabled GCP project** ([docs/web-search-onboarding.md](docs/web-search-onboarding.md)). The rule about keeping confidential terms out of queries is documented in SKILL.md
@@ -344,13 +350,13 @@ To look at the raw surfaces yourself:
 
 ## Implementation notes (for maintainers)
 
-- `route.yaml` uses Switchyard's **route-bundle format** (`switchyard --routing-profiles route.yaml serve`). We migrated off the older v2 profile config (`serve --config` plus a `serve.py` adapter) because upstream PR #119 plans to remove it
-- The image pins a git main commit SHA (`SWITCHYARD_SHA` in the Dockerfile). PyPI v0.1.0 is not used because it predates the streaming usage fix (PR #64)
-- Classifier reasoning suppression is implemented as a sed patch against `request_processor.py`, replacing the vLLM vocabulary `chat_template_kwargs` with the Fireworks-compatible `reasoning_effort: "none"`. Measured 2026-07-23: 18/18 identical decisions, 2.7–4.2× faster. It exists because the deterministic type has no `disable_reasoning` knob; "provider coverage for suppression vocabulary" is on our list of upstream issue candidates
-- The weak tier moved to deepseek-v4-flash-0731 on 2026-08-03 (the official release replacing the preview). Same price, substantially better agentic benchmarks, and the suppression knob works on it as a classifier too (measured: `reasoning_effort: "none"` accepted, completion pinned at 61 tokens, empty `reasoning_content`; without the knob it emits 431 tokens and ~1.5k characters of reasoning). The 0731 model card documents `reasoning_effort` as low/high/max only, but `"none"` is accepted in practice. `thinking: {"type": "disabled"}` was confirmed to give the same result
-- The model ID in the Dockerfile's patch-verification assert feeds `model_accepts_reasoning_hint()`, which keys off provider tags — it is independent of the version number of whatever model a tier points at. Retargeting a tier therefore never requires touching the Dockerfile, and users can update without a rebuild
-- Caution: bumping to a SHA that includes upstream PR #123 (which adds fireworks to the deny list) flips auto-detect to False and stops the injection entirely — safe, but reasoning comes back and things slow down. Re-check this patch whenever you bump the SHA
-- `session_affinity: true` with `affinity_warmup_turns: 2` is enabled by default (measured 2026-07-23: classifier calls −56%, classifier prompt tokens −55%, zero tier switches after pinning). The known trade-off is that tool-planning escalation stops applying once pinned. Fail-open decisions are never pinned, so a low-confidence call cannot get frozen in
-- Upstream's profile-level `subagent_target` (#112) is not used: it is components-v2 only and relies on header detection that opencode never triggers. Per-agent settings in opencode cover the subagent case
-- The compose setup was verified on real hardware under colima with the compose plugin installed via brew (2026-07-23): build → healthy → end-to-end request → JSONL written to the `switchyard-logs` volume → logs surviving `--force-recreate`. All passed
-- `defaults.extra_body: {}` in `route.yaml` is load-bearing: it suppresses the vLLM hint injection in `apply_deepseek_overrides()`. It becomes unnecessary once we bump to a SHA that includes upstream PR #122
+- The router is the **standalone native Rust server** (`switchyard-server --config routes.toml`). We migrated off the Python route-bundle format (`type: deterministic`) after upstream #268 (2026-08-07) removed the legacy Python routing implementations; the previous rails (v2 profile config, then route-bundle) are both gone from main. The old `route.yaml` is preserved under `legacy-routebundle/` in the working repo for reference
+- The image pins a git main commit SHA (`SWITCHYARD_SHA` in the Dockerfile) because no post-#268 release exists yet — crates.io has no `switchyard-server`, PyPI stops at 0.1.0, and the `v0.2.0` tag diverged from main before #268. When a post-#268 tag ships, switch to it (and consider `cargo install` once the release CI publishes crates). The TOML surface rejects unknown keys, so validate any bump with `switchyard-server --config routes.toml --dry-run` before shipping
+- **No source patch anymore.** The old image sed-patched `reasoning_effort: "none"` into the Python classifier; the native judge instead takes suppression as plain config — `extra_body` on the classifier target. `temperature = 0` sits next to it because the judge sends no temperature of its own, and near-threshold verdicts measurably flip between reruns at provider-default temperature (2/10 in our calibration probe)
+- The routing algorithm is `llm_classifier` in **capability mode**: the judge predicts `p_solve` (the probability the weak tier completes the task) and the route compares it against `base_threshold` (+ `threshold_step` per capability-boundary level). Our thresholds (0.75/0.1) were calibrated on 2026-08-08 against an 87-judgment set built from real agent transcripts; at the 0.5 default, deep design discussions leaked to weak (9/13 vs 12/13). Recalibrate by measuring your own p_solve distribution rather than nudging blind
+- The judge reads only the **first and latest user message** of a conversation (plus nothing else, by default) — assistant/tool turns are invisible to it. This is why mid-session judgments are far more stable than the old feature-extraction rubric, and why prompt-side calibration matters less than threshold calibration here
+- Verdicts that fail schema validation, or land outside plain assistant `content`, **fail open to strong** — watch `switchyard_classifier_fail_open_total` on `/metrics`
+- Session affinity uses `session_affinity = true` with `message_hash_fallback = true`. opencode sends a session header the server understands; the message-hash fallback covers clients that do not. Assignments are process-local (they reset on restart) and capped upstream at 4096 sessions
+- Runtime runs as uid 1000 (matching the first user of the old Python image), so the `switchyard-logs` named volume and its `routing.jsonl` history carry across the migration without a chown
+- The `APT::Sandbox::User=root` in the Dockerfile works around a colima/lima quirk where the `_apt` sandbox user cannot read downloaded package lists (apt reports "invalid signature" while gpgv verifies fine). It is harmless on Docker Desktop and Linux
+- Known upstream quirks worth remembering: `/v1/routing/stats` is now `/v1/stats`; the response headers are `x-model-router-selected-model` / `x-model-router-rationale`; the routing log keys sessions off `proxy_x_session_id`, which is a different header from the one affinity uses (upstream known issue #7)

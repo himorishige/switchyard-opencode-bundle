@@ -100,7 +100,7 @@ OpenAI, the API excludes your data from training by default.
 | Check                 | Command                                           | Expected                                 |
 | --------------------- | ------------------------------------------------- | ---------------------------------------- |
 | Router                | `curl -s http://127.0.0.1:4100/health`            | `{"status":"ok"}`                        |
-| Route list            | `curl -s http://127.0.0.1:4100/v1/models`         | auto / strong-only / weak-only / k3-only |
+| Route list            | `curl -s http://127.0.0.1:4100/v1/models`         | auto / auto-esc / strong-only / weak-only / k3-only |
 | opencode              | `opencode run -m switchyard/auto "hello"`         | a response comes back                    |
 | AGENTS.md             | `ls ~/.config/opencode/AGENTS.md`                 | the file exists                          |
 | Environment variables | `env \| grep OPENCODE_`                           | the values from step 3                   |

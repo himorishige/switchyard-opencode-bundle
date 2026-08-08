@@ -95,7 +95,7 @@ README「Agent Plugin（rag-kb / web-search）」の「初期設定（共通・�
 | 確認       | コマンド                                       | 期待する結果                             |
 | ---------- | ---------------------------------------------- | ---------------------------------------- |
 | ルーター   | `curl -s http://127.0.0.1:4100/health`         | `{"status":"ok"}`                        |
-| ルート一覧 | `curl -s http://127.0.0.1:4100/v1/models`      | auto / strong-only / weak-only / k3-only |
+| ルート一覧 | `curl -s http://127.0.0.1:4100/v1/models`      | auto / auto-esc / strong-only / weak-only / k3-only |
 | opencode   | `opencode run -m switchyard/auto "こんにちは"` | 応答が返る                               |
 | AGENTS.md  | `ls ~/.config/opencode/AGENTS.md`              | ファイルが存在する                       |
 | 環境変数   | `env \| grep OPENCODE_`                        | 手順 3 の値が並ぶ                        |
