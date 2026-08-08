@@ -240,21 +240,25 @@ cp plugin/team-ai-kb/mcp.json.example plugin/team-ai-kb/mcp.json
 
 ### opencode で使う
 
-skills を発見パスへリンクし、MCP を Global 設定に 1 エントリ足します。
-
-```bash
-ln -s "$(pwd)/plugin/team-ai-kb/skills/rag-kb" ~/.config/opencode/skills/rag-kb
-ln -s "$(pwd)/plugin/team-ai-kb/skills/web-search" ~/.config/opencode/skills/web-search
-```
+Global 設定に 2 ブロック追記します。symlink は不要です。opencode が起動時にディレクトリを解決するため、リリースで skill が増えても `git pull` だけで反映されます。
 
 ```jsonc
-// ~/.config/opencode/opencode.json の "mcp" ブロックに追記
-"nvidia-rag": {
-  "type": "remote",
-  "url": "http://<rag-service-host>:8091/mcp",
-  "enabled": true
+// ~/.config/opencode/opencode.json
+"skills": {
+  "paths": ["/path/to/switchyard-opencode-bundle/plugin/team-ai-kb/skills"]
+},
+"mcp": {
+  "nvidia-rag": {
+    "type": "remote",
+    "url": "http://<rag-service-host>:8091/mcp",
+    "enabled": true
+  }
 }
 ```
+
+opencode は `~/.claude/skills/` / `~/.agents/skills/` / プロジェクトの `.claude/skills/` からも skills を自動で読み込みます。他のクライアント向けにこれらのパスへ置いてある場合は、上の `skills` ブロックがなくても認識されます。実際に読み込まれた一覧と読み込み元は `opencode debug skill` で確認できます。
+
+以前のリリースでは `~/.config/opencode/skills/` への symlink を案内していました。そちらも引き続き動作し、上のブロックと並存しても壊れません（symlink 側が採用されますが、指し先は同じファイルです）。古いリンクの削除は任意です。
 
 ### Claude Code で使う
 
@@ -277,7 +281,7 @@ codex mcp add nvidia-rag --url "http://<rag-service-host>:8091/mcp"
 
 ### 更新
 
-skills はシンボリックリンク経由なので `git pull` だけで反映されます。`mcp.json.example` が変わったリリースでは、手元の `mcp.json` への反映を確認してください。
+opencode と Claude Code は設定・プラグインディレクトリがバンドルを直接指しているため `git pull` だけで反映されます。Codex の symlink も同様に追随します。`mcp.json.example` が変わったリリースでは、手元の `mcp.json` への反映を確認してください。
 
 ## 運用
 
