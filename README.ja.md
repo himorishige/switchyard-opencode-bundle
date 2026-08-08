@@ -338,6 +338,10 @@ curl -s http://127.0.0.1:4100/health
 
 **使用量・コストの正**: [Fireworks ダッシュボード](https://app.fireworks.ai/)のモデル別使用量を見てください。strong（kimi-k3）と weak（deepseek-v4-flash-0731）は別モデルなので、**モデル別使用量がそのまま tier 分布 × コスト**です。これが削減効果レポートの材料になります。上の stats はルーティング内訳の分析用です。
 
+## 実験用
+
+- [`experimental/permission-judge/`](experimental/permission-judge/) — Claude Code 風の「賢い auto モード」を足す opencode プラグイン。LLM judge（ルーターの weak tier 経由）が permission リクエストの安全性を都度判定し、安全なものだけ自動承認する。較正で一致率が裏づけされるまでは shadow モード（判定・ログのみ、判断は人間）で出荷
+
 ## セキュリティノート
 
 - リスナーは **127.0.0.1 バインドのみ**。LAN には公開されません
