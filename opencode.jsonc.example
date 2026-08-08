@@ -1,27 +1,28 @@
 {
-  // opencode の Global 設定（~/.config/opencode/opencode.json）
+  // opencode global config (~/.config/opencode/opencode.json)
   //
-  // opencode-with-strict-privacy の推奨グローバル設定と、Switchyard ルーターの
-  // 接続設定をマージ済みの完成形です。Global 設定が未作成、または strict-privacy
-  // の推奨構成のままで運用している場合は、このファイルでそのまま上書きできます。
-  // 独自のカスタム設定（theme・他プロバイダ等）がある場合は README の
-  // 「マージ」手順に従ってください。
+  // This is a ready-to-use merge of the recommended global settings from
+  // opencode-with-strict-privacy and the connection settings for the Switchyard
+  // router. If you have no global config yet, or you are running the
+  // strict-privacy recommendations unmodified, you can copy this file over it
+  // as-is. If you have your own customizations (theme, other providers, ...),
+  // follow the "merge" instructions in the README instead.
   //
-  // opencode は JSONC（コメント付き JSON）を正式サポートしているため、
-  // コメントは消さずにそのまま保存して問題ありません。
+  // opencode officially supports JSONC (JSON with comments), so you can keep
+  // these comments in the saved file.
   "$schema": "https://opencode.ai/config.json",
 
-  // --- opencode-with-strict-privacy の推奨グローバル設定 ---
-  // https://github.com/cm-dyoshikawa/opencode-with-strict-privacy/blob/main/README.ja.md
-  // 環境変数側の設定（OPENCODE_ENABLE_EXA=0 等）はこのファイルには含まれない。
-  // シェル rc（~/.zshrc 等）への設定を別途済ませること。
+  // --- recommended global settings from opencode-with-strict-privacy ---
+  // https://github.com/cm-dyoshikawa/opencode-with-strict-privacy
+  // The environment-variable half (OPENCODE_ENABLE_EXA=0 and friends) is not
+  // part of this file. Set those in your shell rc (~/.zshrc etc.) separately.
 
-  // 会話の共有リンク生成を無効化
+  // Disable generation of shareable conversation links
   "share": "disabled",
-  // 自動アップデートを無効化
+  // Disable automatic updates
   "autoupdate": false,
   "tools": {
-    // websearch は Exa/Parallel のホステッド MCP へ検索クエリを送るため無効化
+    // websearch sends queries to the hosted Exa/Parallel MCP, so it is disabled
     "websearch": false,
     "codesearch": false
   },
@@ -30,40 +31,43 @@
     "webfetch": "ask"
   },
 
-  // --- Switchyard ルーター（本バンドル） ---
+  // --- Switchyard router (this bundle) ---
   "provider": {
     "switchyard": {
       "npm": "@ai-sdk/openai-compatible",
       "name": "Switchyard (Fireworks auto-routing)",
       "options": {
         "baseURL": "http://127.0.0.1:4100/v1",
-        // ルーターはキーを検証しないためダミーで良い。
-        // Fireworks の実キーはコンテナ側の .env にだけ置く。
+        // The router does not validate the key, so a dummy value is fine.
+        // The real Fireworks key lives only in the container's .env.
         "apiKey": "local-dummy"
       },
       "models": {
         "auto": { "name": "auto — Switchyard routing" },
         "strong-only": { "name": "strong-only — kimi-k3 pinned" },
         "weak-only": { "name": "weak-only — deepseek-v4-flash-0731 pinned" },
-        // 2026-08-07 の strong=K3 切替以降は strong-only と同じ接続先。
-        // 旧設定の参照を壊さないための別名として残している。
+        // Since strong moved to K3 on 2026-08-07 this points at the same
+        // target as strong-only. Kept as an alias so existing configs that
+        // reference it keep working.
         "k3-only": { "name": "k3-only — kimi-k3 pinned (alias of strong-only)" }
       }
     }
   },
 
-  // 既定モデル = 自動ルーティング
+  // Default model = automatic routing
   "model": "switchyard/auto",
-  // タイトル生成などの補助コールは weak 固定（auto だと strong に化けることがある）
+  // Auxiliary calls such as title generation are pinned to weak
+  // (through auto they occasionally turn into strong calls)
   "small_model": "switchyard/weak-only",
 
-  // strong=K3（output $15/1M）への切替に伴い、agent 単位の固定を既定有効にした。
-  // - plan: strong（Kimi K3）直結。coding_agent の classifier はコード軸の
-  //   特徴量のため、非コードの深い議論を高確信で SIMPLE と誤判定することが
-  //   あり、壁打ちの品質を classifier に賭けない
-  // - explore / scout: サブエージェントは呼び出し元のモデルを継承するため、
-  //   weak を明示して継承を断つ。省くと grep 結果の読み取りのような
-  //   単純作業にも K3 の output 単価が乗る
+  // Per-agent pinning, enabled by default now that strong is K3 ($15/1M output).
+  // - plan: wired straight to strong (Kimi K3). The coding_agent classifier
+  //   decides on code-centric features, so it can rate a deep non-code
+  //   discussion as SIMPLE with high confidence. Design conversations should
+  //   not be a bet on the classifier
+  // - explore / scout: subagents inherit the model of whatever called them, so
+  //   pinning weak explicitly cuts the inheritance. Without it, work as simple
+  //   as reading grep output is billed at K3's output rate
   "agent": {
     "plan": { "model": "switchyard/strong-only" },
     "explore": { "model": "switchyard/weak-only" },

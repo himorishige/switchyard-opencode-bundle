@@ -1,68 +1,78 @@
-# web-search skill オンボーディング
+# web-search skill onboarding
 
-web-search skill（`plugin/team-ai-kb/skills/web-search/`）は、各自の API キーで
-検索バックエンドを直接呼びます。中間サーバはありません。
-バックエンドは **Gemini（推奨）/ OpenAI（代替）** の 2 つで、どちらか一方だけで動きます。
-設定済みのキーの環境変数から自動判別されます（両方ある場合は Gemini 優先。
-`WEB_SEARCH_PROVIDER=openai` で明示切替）。
+**English** | [日本語](web-search-onboarding.ja.md)
 
-## バックエンドの選び方
+The web-search skill (`plugin/team-ai-kb/skills/web-search/`) calls a search backend directly with
+your own API key. There is no intermediary server.
+Two backends are supported — **Gemini (recommended) and OpenAI (alternative)** — and either one works
+on its own. The skill picks whichever key you have configured (Gemini wins if both are set; override
+with `WEB_SEARCH_PROVIDER=openai`).
 
-| バックエンド   | 学習不使用の条件                                                              | 無料枠             | 超過時の目安  | 所要  |
-| -------------- | ----------------------------------------------------------------------------- | ------------------ | ------------- | ----- |
-| Gemini（推奨） | **課金有効の GCP プロジェクトのキーであること**（free tier は学習利用される） | 月 5,000 クエリ/人 | $14/1k クエリ | 15 分 |
-| OpenAI（代替） | API 既定で学習不使用（追加条件なし）                                          | なし               | ≈$0.012/検索  | 5 分  |
+## Choosing a backend
 
-普段使いは無料枠のある Gemini を推奨します。課金有効の GCP プロジェクトが用意できない場合は
-OpenAI を使ってください。
+| Backend              | Condition for exclusion from training                                                           | Free tier                  | Cost beyond it     | Setup  |
+| -------------------- | ----------------------------------------------------------------------------------------------- | -------------------------- | ------------------ | ------ |
+| Gemini (recommended) | **The key must come from a billing-enabled GCP project** (free-tier keys are used for training) | 5,000 queries/month/person | $14 per 1k queries | 15 min |
+| OpenAI (alternative) | Excluded by default on the API (no extra conditions)                                            | none                       | ≈$0.012 per search | 5 min  |
 
-## Gemini で使う（15 分）
+Gemini is recommended for everyday use because of the free tier. If you cannot get a billing-enabled
+GCP project, use OpenAI.
 
-**必ず課金有効の GCP プロジェクトで発行したキーを使ってください。**
-free tier（課金未設定）のキーは、Google の利用規約上、検索クエリがモデル学習に使われます。
-課金有効プロジェクトのキーは paid tier 扱いとなり学習不使用（DPA 適用）です。
-この手順で唯一外せないポイントがここです。
+## Using Gemini (15 minutes)
 
-1. **GCP プロジェクト作成**（1 分）
-   - https://console.cloud.google.com/ → 新規プロジェクト（例: `websearch-<name>`）
-   - 他用途と分けるため websearch 専用プロジェクトを推奨（Cloud Billing のレポートが
-     そのまま検索コストのレポートになります）
-2. **課金アカウントをリンク**（2 分・必須）
-   - プロジェクト設定 → 請求先アカウントをリンク
-   - 無料枠（月 5,000 クエリ）内なら請求は発生しません。リンクは「paid tier = 学習不使用」の条件です
-3. **API キー発行**（2 分）
-   - https://aistudio.google.com/ → API keys → 上で作ったプロジェクトを選んで発行
-4. **キーを環境変数に配置**（2 分）
-   - `~/.zshenv` 等に `export GEMINI_API_KEY=<キー>`（ファイルは chmod 600、キーはパスワードマネージャにも保管）
-   - git 管理下のファイルには絶対に書かない
-5. **動作確認**（1 分）
-   - `uv run plugin/team-ai-kb/skills/web-search/scripts/search.py "DGX Spark のメモリ帯域は？"`
-   - 回答 + `Sources:` + 統計行（`-- provider=gemini model=... executed_queries=... tokens=...`）が出れば OK
-   - キー未設定・無効の場合はエラーメッセージが案内を出します
-   - モデル既定は `gemini-3.6-flash`。変更する場合は `WEB_SEARCH_MODEL` 環境変数で上書き
+**You must use a key issued from a billing-enabled GCP project.**
+Under Google's terms, queries made with a free-tier key (no billing configured) are used to train
+models. A key from a billing-enabled project counts as paid tier and is excluded from training (the
+DPA applies). This is the one point in this procedure you cannot skip.
 
-## OpenAI で使う（5 分）
+1. **Create a GCP project** (1 min)
+   - https://console.cloud.google.com/ → new project (for example `websearch-<name>`)
+   - A dedicated websearch project is recommended so it stays separate from other work — your Cloud
+     Billing report then doubles as your search cost report
+2. **Link a billing account** (2 min, required)
+   - Project settings → link a billing account
+   - Nothing is charged while you stay inside the free tier (5,000 queries/month). The link is what
+     makes the key paid tier, and therefore excluded from training
+3. **Issue an API key** (2 min)
+   - https://aistudio.google.com/ → API keys → select the project you just created
+4. **Put the key in an environment variable** (2 min)
+   - `export GEMINI_API_KEY=<key>` in `~/.zshenv` or similar (`chmod 600` the file, and keep the key
+     in your password manager as well)
+   - Never write it into a file under git
+5. **Verify** (1 min)
+   - `uv run plugin/team-ai-kb/skills/web-search/scripts/search.py "What is the memory bandwidth of DGX Spark?"`
+   - You should get an answer, a `Sources:` list, and a stats line
+     (`-- provider=gemini model=... executed_queries=... tokens=...`)
+   - If the key is missing or invalid, the error message tells you what to do
+   - The default model is `gemini-3.6-flash`; override it with the `WEB_SEARCH_MODEL` environment variable
 
-学習不使用は API の既定です（明示的にオプトインしない限り学習に使われません。
-不正利用監視のための最大 30 日保持はあります）。無料枠はなく、1 検索 ≈$0.012
-（web search ツール課金 + トークン実費）が各自のアカウントに課金されます。
+## Using OpenAI (5 minutes)
 
-1. **API キー発行**（2 分）
-   - https://platform.openai.com/api-keys から発行（Organization 経由で払い出す場合はチームの案内に従ってください）
-2. **キーを環境変数に配置**（2 分）
-   - `~/.zshenv` 等に `export OPENAI_API_KEY=<キー>`（chmod 600・パスワードマネージャ保管・git 管理下に書かない、は Gemini と同じです）
-   - `GEMINI_API_KEY` も設定している場合は Gemini が優先されます。OpenAI を使うときは
-     `export WEB_SEARCH_PROVIDER=openai` を追加してください
-3. **動作確認**（1 分）
-   - コマンドは Gemini と同じです。統計行が `-- provider=openai model=gpt-5-mini ...` になっていれば OK
-   - モデル既定は `gpt-5-mini`。変更する場合は `WEB_SEARCH_MODEL` 環境変数で上書き
+Exclusion from training is the API default — your data is not used unless you explicitly opt in
+(there is retention of up to 30 days for abuse monitoring). There is no free tier; each search costs
+roughly $0.012 (the web search tool charge plus token usage) against your own account.
 
-## 運用ルール（両バックエンド共通）
+1. **Issue an API key** (2 min)
+   - From https://platform.openai.com/api-keys (if keys are issued through an organization, follow
+     your team's instructions)
+2. **Put the key in an environment variable** (2 min)
+   - `export OPENAI_API_KEY=<key>` in `~/.zshenv` or similar — same rules as Gemini: `chmod 600`,
+     password manager, never under git
+   - If `GEMINI_API_KEY` is also set, Gemini takes precedence. To use OpenAI, add
+     `export WEB_SEARCH_PROVIDER=openai`
+3. **Verify** (1 min)
+   - Same command as Gemini. You are set if the stats line reads `-- provider=openai model=gpt-5-mini ...`
+   - The default model is `gpt-5-mini`; override it with the `WEB_SEARCH_MODEL` environment variable
 
-- **機密語（顧客名・社内コードネーム・シークレット）をクエリに入れない**（SKILL.md のクエリ規律参照）
-- 同じ質問の言い換えリトライを機械的に繰り返さない（2 回試して駄目なら質問を変えるか、ソースを直接 fetch する）
-- ローカルナレッジで足りる話題（チームの検証記録・過去記事）は rag-kb を先に使う
-- Gemini の無料枠は**各自のプロジェクトごとに月 5,000 検索クエリ**。1 回の呼び出しで 1〜3 クエリ実行され、
-  統計行の `executed_queries` が課金単位です（目安 = 1 日 10〜16 回で枠内）。
-  超過分と OpenAI の利用分は各自のアカウントに課金されるので、使用量は各自のダッシュボード
-  （AI Studio / Cloud Billing、OpenAI Usage）で確認してください
+## Ground rules (both backends)
+
+- **Keep confidential terms out of queries** — customer names, internal code names, secrets (see the
+  query discipline in SKILL.md)
+- Do not mechanically retry the same question with reworded queries (after two attempts, change the
+  question or fetch the source directly)
+- For topics the local knowledge base covers (team verification records, past articles), try rag-kb first
+- Gemini's free tier is **5,000 executed search queries per month, per project**. One call runs 1–3
+  queries, and the `executed_queries` value in the stats line is the billing unit (as a rule of thumb,
+  10–16 calls a day stays inside the tier).
+  Overage, and all OpenAI usage, is billed to your own account — check your usage on your own
+  dashboards (AI Studio / Cloud Billing, OpenAI Usage)
