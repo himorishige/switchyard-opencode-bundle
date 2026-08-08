@@ -240,21 +240,31 @@ cp plugin/team-ai-kb/mcp.json.example plugin/team-ai-kb/mcp.json
 
 ### With opencode
 
-Link the skills into the discovery path and add one MCP entry to your global config.
-
-```bash
-ln -s "$(pwd)/plugin/team-ai-kb/skills/rag-kb" ~/.config/opencode/skills/rag-kb
-ln -s "$(pwd)/plugin/team-ai-kb/skills/web-search" ~/.config/opencode/skills/web-search
-```
+Add two blocks to your global config. No symlinks are needed: opencode resolves the directory at
+startup, so skills added by a later release appear after a `git pull`.
 
 ```jsonc
-// add to the "mcp" block of ~/.config/opencode/opencode.json
-"nvidia-rag": {
-  "type": "remote",
-  "url": "http://<rag-service-host>:8091/mcp",
-  "enabled": true
+// ~/.config/opencode/opencode.json
+"skills": {
+  "paths": ["/path/to/switchyard-opencode-bundle/plugin/team-ai-kb/skills"]
+},
+"mcp": {
+  "nvidia-rag": {
+    "type": "remote",
+    "url": "http://<rag-service-host>:8091/mcp",
+    "enabled": true
+  }
 }
 ```
+
+opencode also auto-loads skills from `~/.claude/skills/`, `~/.agents/skills/`, and a project's
+`.claude/skills/`. If you already keep these skills in one of those paths for another client, they
+are picked up without the `skills` block above. `opencode debug skill` prints what is actually
+loaded, with the path each one came from.
+
+Earlier releases asked you to symlink each skill into `~/.config/opencode/skills/`. That still
+works and coexists with the block above (the symlink wins, and it points at the same file), so
+removing the old links is optional.
 
 ### With Claude Code
 
@@ -277,7 +287,7 @@ For non-interactive runs (`codex exec`), add one line to `[mcp_servers.nvidia-ra
 
 ### Updating
 
-The skills are symlinked, so `git pull` is enough. When a release changes `mcp.json.example`, check whether your local `mcp.json` needs the same change.
+For opencode and Claude Code, `git pull` is enough: the config and the plugin directory both point at the bundle. Codex uses symlinks, which follow the pull just as well. When a release changes `mcp.json.example`, check whether your local `mcp.json` needs the same change.
 
 ## Operations
 
