@@ -19,6 +19,8 @@ opencode → Switchyard (127.0.0.1:4100) → Fireworks AI
 
 設定は `routes.toml`（Switchyard ネイティブ Rust サーバーの設定形式）1 枚です。
 
+**画像を添付するとき**は `strong-only` または `k3-only` を使ってください。どちらも画像を読める Kimi K3 を固定しており、opencode 設定側で `modalities` を宣言しているので添付が実際に送信されます。宣言のないモデルでは opencode が画像を黙って落とし、モデルが「画像を読めません」と答えます。`auto` / `auto-esc` / `weak-only` はあえて宣言していません。weak tier（deepseek-v4-flash-0731）が画像入力を拒否するためで、`auto` ではセッションアフィニティによって weak に固定済みのセッションへスクリーンショットが渡り、上流から 400 が返ります。
+
 > 初めてセットアップする場合は、[docs/onboarding.ja.md](docs/onboarding.ja.md)（初回セットアップの一本道手順）から始めるのがおすすめです。
 
 ## 前提
@@ -119,9 +121,15 @@ theme や他プロバイダなど独自の設定を足している場合は、�
     "models": {
       "auto": { "name": "auto — Switchyard routing" },
       "auto-esc": { "name": "auto-esc — weak-first, escalates on trouble" },
-      "strong-only": { "name": "strong-only — kimi-k3 pinned" },
+      "strong-only": {
+        "name": "strong-only — kimi-k3 pinned",
+        "modalities": { "input": ["text", "image"], "output": ["text"] }
+      },
       "weak-only": { "name": "weak-only — deepseek-v4-flash-0731 pinned" },
-      "k3-only": { "name": "k3-only — kimi-k3 pinned (alias of strong-only)" }
+      "k3-only": {
+        "name": "k3-only — kimi-k3 pinned (alias of strong-only)",
+        "modalities": { "input": ["text", "image"], "output": ["text"] }
+      }
     }
   }
 },

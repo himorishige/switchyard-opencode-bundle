@@ -48,12 +48,27 @@
         // per session after a clear pattern of trouble). Buffered streaming
         // until the latch — see README "Evidence-based escalation".
         "auto-esc": { "name": "auto-esc — weak-first, escalates on trouble" },
-        "strong-only": { "name": "strong-only — kimi-k3 pinned" },
+        // `modalities` is what makes opencode send an image at all: without it
+        // an attachment is dropped and the model answers "I cannot read
+        // images", however capable the upstream model is. Kimi K3 reads
+        // images, so both routes that pin it declare the input modality.
+        "strong-only": {
+          "name": "strong-only — kimi-k3 pinned",
+          "modalities": { "input": ["text", "image"], "output": ["text"] }
+        },
+        // Deliberately NO modalities on auto / auto-esc / weak-only: the weak
+        // tier (deepseek-v4-flash-0731) rejects image input outright. Declaring
+        // it there would let opencode send a screenshot into a session already
+        // pinned to weak, which fails with an upstream 400. Attach images on
+        // strong-only / k3-only instead.
         "weak-only": { "name": "weak-only — deepseek-v4-flash-0731 pinned" },
         // Since strong moved to K3 on 2026-08-07 this points at the same
         // target as strong-only. Kept as an alias so existing configs that
         // reference it keep working.
-        "k3-only": { "name": "k3-only — kimi-k3 pinned (alias of strong-only)" }
+        "k3-only": {
+          "name": "k3-only — kimi-k3 pinned (alias of strong-only)",
+          "modalities": { "input": ["text", "image"], "output": ["text"] }
+        }
       }
     }
   },

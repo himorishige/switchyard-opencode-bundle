@@ -19,6 +19,8 @@ opencode → Switchyard (127.0.0.1:4100) → Fireworks AI
 
 Everything is configured in a single file, `routes.toml` (the config format of Switchyard's native Rust server).
 
+**Attaching images**: use `strong-only` or `k3-only`. Both pin Kimi K3, which reads images, and both declare `modalities` in the opencode config so the attachment is actually sent — opencode silently drops an image for any model that does not declare it, and the model then replies that it cannot read images. `auto`, `auto-esc` and `weak-only` intentionally leave the declaration out, because the weak tier (deepseek-v4-flash-0731) rejects image input: on `auto`, session affinity can hand a screenshot to a session already pinned to weak, which fails with an upstream 400.
+
 > Setting this up for the first time? Start from [docs/onboarding.md](docs/onboarding.md), a single linear path through the whole setup.
 
 ## Requirements
@@ -119,9 +121,15 @@ If you have your own settings — a theme, other providers — do not overwrite.
     "models": {
       "auto": { "name": "auto — Switchyard routing" },
       "auto-esc": { "name": "auto-esc — weak-first, escalates on trouble" },
-      "strong-only": { "name": "strong-only — kimi-k3 pinned" },
+      "strong-only": {
+        "name": "strong-only — kimi-k3 pinned",
+        "modalities": { "input": ["text", "image"], "output": ["text"] }
+      },
       "weak-only": { "name": "weak-only — deepseek-v4-flash-0731 pinned" },
-      "k3-only": { "name": "k3-only — kimi-k3 pinned (alias of strong-only)" }
+      "k3-only": {
+        "name": "k3-only — kimi-k3 pinned (alias of strong-only)",
+        "modalities": { "input": ["text", "image"], "output": ["text"] }
+      }
     }
   }
 },
