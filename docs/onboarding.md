@@ -73,11 +73,20 @@ cat > ~/.config/opencode/AGENTS.md <<'EOF'
 # Global rules
 
 - Never put customer names, internal project names, or unreleased code names into web search queries
+- Reply in the same language the user writes in
 EOF
 ```
 
 - If you already maintain your own AGENTS.md, you are fine — the fallback only fires when the file is absent
-- The content can be minimal. The line above is the team's recommended query discipline
+- The content can be minimal. The first line is the team's recommended query discipline
+- The second line is worth keeping even if you write your own file. Open-weight models do not always
+  follow the language of the question: with no system prompt at all, the weak tier answered 6 of 15
+  Japanese prompts in Chinese. The failure is easy to miss because the answer itself is usually fine —
+  it is just in the wrong language
+- **Write this file in the language you ask questions in.** The file's own language anchors the reply
+  more strongly than the instruction does. On those same 15 Japanese prompts: an English file with the
+  language line still left 2 misses, while a Japanese file with the line written in Japanese left 0.
+  An English file without the line left 4
 
 ## 5. Agent Plugin (team-ai-kb)
 
@@ -97,14 +106,14 @@ OpenAI, the API excludes your data from training by default.
 
 ## 7. Verification checklist
 
-| Check                 | Command                                           | Expected                                 |
-| --------------------- | ------------------------------------------------- | ---------------------------------------- |
-| Router                | `curl -s http://127.0.0.1:4100/health`            | `{"status":"ok"}`                        |
+| Check                 | Command                                           | Expected                                            |
+| --------------------- | ------------------------------------------------- | --------------------------------------------------- |
+| Router                | `curl -s http://127.0.0.1:4100/health`            | `{"status":"ok"}`                                   |
 | Route list            | `curl -s http://127.0.0.1:4100/v1/models`         | auto / auto-esc / strong-only / weak-only / k3-only |
-| opencode              | `opencode run -m switchyard/auto "hello"`         | a response comes back                    |
-| AGENTS.md             | `ls ~/.config/opencode/AGENTS.md`                 | the file exists                          |
-| Environment variables | `env \| grep OPENCODE_`                           | the values from step 3                   |
-| Web search            | the verification step in web-search-onboarding.md | an answer, `Sources:`, and a stats line  |
+| opencode              | `opencode run -m switchyard/auto "hello"`         | a response comes back                               |
+| AGENTS.md             | `ls ~/.config/opencode/AGENTS.md`                 | the file exists                                     |
+| Environment variables | `env \| grep OPENCODE_`                           | the values from step 3                              |
+| Web search            | the verification step in web-search-onboarding.md | an answer, `Sources:`, and a stats line             |
 
 - After a long idle period the first call can take tens of seconds because of a cold start (a few
   seconds from the second call onward). Adding `--max-time` to your connectivity checks makes it
