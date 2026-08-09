@@ -61,6 +61,19 @@ base_threshold = 0.75
 threshold_step = 0.1
 session_affinity = true
 message_hash_fallback = true
+# How much of the conversation the judge sees. Unset, it reads only the opening
+# user task and the latest user message - and on a coding turn that is too little
+# to forecast with, so the judge thinks its way to an answer instead. Showing it
+# the trailing turns (assistant replies and tool results) settles the question
+# immediately: measured over 320 judgments on real agent-loop shapes, the routing
+# decision did not change, while judge thinking fell from ~1,700 tokens to ~250
+# and judgment latency went from p50 17.5s / p90 30.6s to p50 3.0s / p90 4.9s.
+# The effect saturates at 2; 4 leaves room for the tool-pair rule below to widen
+# the window without losing turns, and costs ~2% more prompt tokens than 2.
+# Note the server never splits a tool result from the call it answers - the
+# window start moves back to keep pairs whole (upstream PR #309).
+# Measurements: window-eval/results.md in the project workspace.
+recent_turn_window = 4
 
 # Opt-in: evidence-based escalation. Every session starts on the weak tier; a
 # trajectory judge watches for a clear pattern of trouble (repeated identical
