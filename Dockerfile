@@ -1,21 +1,28 @@
-# --- builder: compile the standalone native Rust server (switchyard-server).
-# Since upstream #268 (2026-08-07) the routing algorithms live in Rust crates;
-# the Python package no longer ships them. crates.io has no post-#268 release
-# yet, so we build from a pinned main commit. No Python needed at all.
+# --- builder: install the standalone native Rust server (switchyard-server).
+# The routing algorithms live in Rust crates; the Python package no longer
+# ships them on the native path. Since Switchyard 0.2.0 (2026-08-10) the
+# server is published on crates.io, so this is a plain `cargo install` from a
+# released version instead of a build from a pinned git commit. No Python at
+# all.
 ARG RUST_VERSION=1.96.1
 FROM rust:${RUST_VERSION}-bookworm AS builder
 
-# Pin to a main commit that includes #268 (legacy Python routing removal) and
-# the native server. Bump deliberately; the TOML config surface is
-# deny_unknown_fields, so validate with --dry-run after any bump.
-ARG SWITCHYARD_SHA=f30498d31b6d436954960f5a4b5a8cd3a5afba27
+# Released version, not a main commit. The v0.2.0 tag has diverged from main:
+# main carries the next development cycle (internal Rust API churn), so
+# following it means running an unreleased server. Bump deliberately - the TOML
+# config surface is deny_unknown_fields, so validate with --dry-run afterwards.
+#
+# Note what 0.2.0 is: it was published from d0b9d50b (#329), 57 minutes before
+# #268 landed on main. So the release still carries the deprecated Python
+# `switchyard serve` path, and it predates the per-route client router that
+# #268 introduced. We only use the native server binary, so neither matters
+# here - but do not assume "0.2.0" and "main around 2026-08-07" are the same
+# code.
+ARG SWITCHYARD_VERSION=0.2.0
 
-WORKDIR /opt
-RUN curl -fsSL "https://github.com/NVIDIA-NeMo/Switchyard/archive/${SWITCHYARD_SHA}.tar.gz" \
-        | tar xz \
-    && mv "Switchyard-${SWITCHYARD_SHA}" switchyard
-WORKDIR /opt/switchyard
-RUN cargo build --locked --release -p switchyard-server
+RUN cargo install --locked switchyard-server \
+        --version "${SWITCHYARD_VERSION}" \
+        --root /opt/out
 
 # --- runtime: static-ish binary on a slim base. Half the size of the old
 # Python image, and no site-packages patch: reasoning suppression for the
@@ -33,7 +40,7 @@ RUN apt-get -o APT::Sandbox::User=root update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder \
-    /opt/switchyard/target/release/switchyard-server \
+    /opt/out/bin/switchyard-server \
     /usr/local/bin/switchyard-server
 
 WORKDIR /app

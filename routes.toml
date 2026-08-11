@@ -23,20 +23,32 @@ api_key_env = "FIREWORKS_API_KEY"
 
 # Classifier = weak-tier model doubling as judge (same pattern as the legacy bundle).
 #
-# Deliberately NO extra_body here. The server routes serving calls through a
-# per-route map keyed by MODEL ID (build_client_router), so when classifier and
-# weak share a model id, one backend silently serves both. With thinking
-# suppression declared here, weak-tier USER responses were generated with
-# reasoning_effort "none" + temperature 0 (verified 2026-08-08, minimal repro in
-# bugfix-extrabody-leak/). Keeping this target parameter-identical to weak makes
-# the collision harmless. Trade-off: the judge now thinks at provider defaults
-# (~200-600 completion tokens, a few seconds per judgment; session affinity keeps
-# it to session starts) and near-threshold verdicts can flip across reruns
-# (2/10 in the M2 variance probe). Recalibration check 2026-08-08: 87 judgments,
-# production shapes 40/40 weak unchanged at base_threshold 0.75.
+# Thinking suppression for the judge. A verdict is a probability, not an essay,
+# so letting the judge reason costs seconds and tokens for nothing. Fireworks
+# accepts reasoning_effort "none" even though the model card lists only
+# low/medium/high. temperature 0 pins near-threshold verdicts, which otherwise
+# flip across reruns (2/10 in the M2 variance probe).
+#
+# Measured 2026-08-11 over the 87-judgment calibration set, suppressed vs not:
+# judge p50 2.2s vs 10.4s, p90 4.4s vs 44.5s. Agent-loop shapes are unaffected
+# (30/30 weak either way); the difference shows up only on open-ended business
+# sparring, which lands on weak more often when the judge does not think
+# (9/13 vs 12/13 reaching strong). We accept that: a three-way blind comparison
+# on that same set found weak/strong answers equally usable there.
+#
+# IMPORTANT - do not carry this to an unreleased build. Between #268 and at
+# least main @ fb3fc308, serving calls resolve through a per-route map keyed by
+# MODEL ID (build_client_router), so a target's extra_body is applied to any
+# other target sharing its id - here, the weak tier's USER responses were
+# silently generated with reasoning suppressed (repro + measurements in
+# bugfix-extrabody-leak/ and phase3/calib-v020/). Released 0.2.0 predates that
+# refactor and keeps each target's backend separate, which is why this block is
+# safe again. Both binaries report "switchyard-server 0.2.0", so verify by
+# behavior, not by version string.
 [targets.classifier]
 id = "accounts/fireworks/models/deepseek-v4-flash-0731"
 llm_client = "fireworks_judge"
+extra_body = { reasoning_effort = "none", temperature = 0 }
 
 [targets.strong]
 id = "accounts/fireworks/models/kimi-k3"
