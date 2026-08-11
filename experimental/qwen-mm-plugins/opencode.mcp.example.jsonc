@@ -1,0 +1,30 @@
+// Merge this `mcp` block into your opencode config (global ~/.config/opencode/opencode.json
+// or a project-level one). Nothing else in your config needs to change.
+//
+// The commit is pinned on purpose. Upstream reorganised the capabilities on 2026-08-11:
+// vision_chat / ocr / grounding moved out of `core`, the `omni-av` extra was removed, and
+// everything that calls an external API now lives in `api`. Tracking @main means the next
+// reshuffle silently empties your toolset.
+{
+  "mcp": {
+    "qwen-mm-plugins-api": {
+      "type": "local",
+      "command": [
+        "uvx",
+        "--from",
+        "qwen-mm-plugins[api] @ git+https://github.com/QwenLM/Qwen-MM-Plugins.git@8d6ea5a1f658260743307c52c2024ec87599fa48",
+        "qwen-mm-plugins-api"
+      ],
+      "environment": {
+        // Point the plugin at the router, not at DashScope. The route id in
+        // routes.snippet.toml matches the model name the plugin asks for by default.
+        "DASHSCOPE_BASE_URL": "http://127.0.0.1:4100/v1",
+        // Self-hosted and proxied endpoints ignore auth; the router holds the real key.
+        "DASHSCOPE_API_KEY": "EMPTY",
+        // Media calls are slower than chat. The default read timeout is too tight.
+        "QWEN_MM_CHAT_TIMEOUT": "900"
+      },
+      "enabled": true
+    }
+  }
+}

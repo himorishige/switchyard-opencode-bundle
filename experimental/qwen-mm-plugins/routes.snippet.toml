@@ -1,0 +1,33 @@
+# Append this to routes.toml to give the text-only weak tier an "eye".
+# See README.md in this directory for what it does and what it cannot do.
+#
+# Validate before restarting:
+#   docker compose run --rm switchyard --config /app/routes.toml --dry-run
+#   docker compose restart
+
+# The hosted vision model the plugin's tools call.
+#
+# extra_body suppresses the reasoning pass. qwen3p7-plus thinks on every call - naming four
+# items in a photo cost 845 completion tokens and 2.95s with it on, 302 tokens and 1.61s with
+# it off, at identical accuracy. Qwen-MM-Plugins has no knob for this, so the router injects it
+# for every caller at once. Fireworks accepts "none" even though the model card lists only
+# low/medium/high.
+#
+# Reusing the plain `fireworks` client is safe here: the server dedupes targets by
+# (llm_client, model id), and no other target uses this model id. If you ever point this at
+# the same model as [targets.weak], declare a second llm_client for it instead.
+[targets.fw_qwen_vl]
+id = "accounts/fireworks/models/qwen3p7-plus"
+llm_client = "fireworks"
+extra_body = { reasoning_effort = "none" }
+
+# The route id is deliberately the plugin's DEFAULT model name (shared/api_openai.py
+# DEFAULT_MODEL). Because of that, pointing DASHSCOPE_BASE_URL at this router is the only
+# configuration needed - no per-call `model` argument, no patch to the plugin.
+#
+# passthrough, so the classifier never sees the image payload and you are not billed for
+# routing decisions on media calls.
+[routes.omni-vision]
+id = "qwen3.7-plus"
+type = "passthrough"
+target = "fw_qwen_vl"
