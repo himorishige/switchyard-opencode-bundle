@@ -353,6 +353,7 @@ curl -s http://127.0.0.1:4100/health
 ## 実験用
 
 - [`experimental/permission-judge/`](experimental/permission-judge/) — Claude Code 風の「賢い auto モード」を足す opencode プラグイン。LLM judge（ルーターの weak tier 経由）が permission リクエストの安全性を都度判定し、安全なものだけ自動承認する。較正で一致率が裏づけされるまでは shadow モード（判定・ログのみ、判断は人間）で出荷
+- [`experimental/qwen-mm-plugins/`](experimental/qwen-mm-plugins/) — テキスト専用の weak tier に画像を扱わせる。[Qwen-MM-Plugins](https://github.com/QwenLM/Qwen-MM-Plugins) のツールをホスト型 vision モデルへルーティングする構成で、脳は画像を一度も受け取らないので tier は安いテキストモデルのまま。画像のみ対応 —— 音声と手元の動画にはセルフホストのモデルが要る
 
 ## セキュリティノート
 

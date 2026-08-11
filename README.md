@@ -359,6 +359,7 @@ One improvement over the previous setup: the classifier's own calls now appear i
 ## Experimental
 
 - [`experimental/permission-judge/`](experimental/permission-judge/) — an opencode plugin that adds a Claude Code-style "smart auto mode": an LLM judge (via the router's weak tier) classifies permission requests and only safe ones are auto-approved. Ships in shadow mode (judge and log only, humans still decide) until calibration proves agreement
+- [`experimental/qwen-mm-plugins/`](experimental/qwen-mm-plugins/) — lets the text-only weak tier answer questions about images, by routing [Qwen-MM-Plugins](https://github.com/QwenLM/Qwen-MM-Plugins) tools to a hosted vision model. The brain never receives an image, so the tier stays on the cheap text model. Images only — audio and local video need a self-hosted model
 
 ## Security notes
 
