@@ -53,7 +53,7 @@ chmod 600 .env
 docker compose up -d --build
 ```
 
-初回は Switchyard のネイティブ Rust サーバーをソースからビルドするため、マシン性能により 10〜20 分程度かかります。2 回目以降は Docker レイヤーキャッシュが効くため、ピン留めバージョンが変わらない限り数十秒で終わります。
+初回は Switchyard のネイティブ Rust サーバーを crates.io から取得してビルドします。Apple Silicon Mac で 1 分半ほど、遅いマシンではもう少しかかります。2 回目以降は Docker レイヤーキャッシュが効くため、ピン留めバージョンが変わらない限り数十秒で終わります。
 
 colima 等の Docker Desktop 以外の環境では、`docker compose` サブコマンドが入っていないことがあります。その場合はスタンドアロン版 compose を導入します。
 
@@ -325,8 +325,8 @@ curl -s http://127.0.0.1:4100/health
 
 - 使えるモデル ID は [Fireworks serverless カタログ](https://app.fireworks.ai/models?capability=serverless)で確認できます
 - opencode 側は route 名（`auto` / `strong-only` / `weak-only` / `k3-only`）しか見ていないため、向き先を変えるだけなら `opencode.json` の変更は不要です。モデルピッカーの表示名も実態に合わせたい場合は、`opencode.json` の `models` 配下の `name` を書き換えてください。route 名そのものを増やした場合は `models` への登録が別途必要です
-- classifier target のモデルを変更した場合は、変更後に 1 リクエスト流して judge の健全性を確認してください（`curl -s http://127.0.0.1:4100/v1/stats` → `classifier`）。judge はプロバイダ既定パラメータで動きます（`extra_body` なし——次項参照）。judge の回答が素の `content` の外（reasoning 領域）に出るようになると、全判定が fail-open で strong に倒れます
-- **モデル ID 衝突の罠は 2 層あります。** サーバーは (llm_client, model id) の組で target を重複排除し、重複した片方を黙って落とします——classifier target が専用の `[llm_clients.fireworks_judge]` を使っているのはこのためです。これとは別に、サービング呼び出しは **route ごとのモデル ID のみをキーとするマップ**で解決されるため、tier と同一モデルの classifier target は tier と**パラメータ完全一致**である必要があります。ここに `extra_body` を置くと、その tier のユーザー応答にも黙って適用されます（2026-08-08 実測——judge 用の思考抑制が weak tier の回答に適用されていました）
+- classifier target のモデルを変更した場合は、変更後に 1 リクエスト流して judge の健全性を確認してください（`curl -s http://127.0.0.1:4100/v1/stats` → `classifier`）。judge は `extra_body` で思考を抑制していますが、このノブを解釈しないプロバイダもあります。judge の回答が素の `content` の外（reasoning 領域）に出るようになると、全判定が fail-open で strong に倒れます
+- **モデル ID 衝突の罠——1 つはこの構成にも効き、もう 1 つはリリース版を離れた場合だけ効きます。** サーバーは (llm_client, model id) の組で target を重複排除し、重複した片方を黙って落とします——classifier target が専用の `[llm_clients.fireworks_judge]` を使っているのはこのためで、これは 0.2.0 を含む全バージョンに当てはまります。もう 1 つは違います。**#268 以降のビルド**では、サービング呼び出しが route ごとのモデル ID のみをキーとするマップで解決されるため、tier と同一モデルの classifier target に置いた `extra_body` が、その tier のユーザー応答にも適用されます（2026-08-08 実測。2026-08-11 に両ビルドを並べて再測し、リリース版 0.2.0 では起きないことを確認）。**リリース版ではなく main の commit をピンする場合は、先に classifier の `extra_body` を外してください**
 
 ### 定期レビュー（ルーティング実績の回収）
 
@@ -368,8 +368,9 @@ curl -s http://127.0.0.1:4100/health
 ## 実装メモ（メンテナ向け）
 
 - ルーターは **standalone のネイティブ Rust サーバー**（`switchyard-server --config routes.toml`）。上流 #268（2026-08-07）が Python のルーティング実装を削除したため、route-bundle 形式（`type: deterministic`）から移行した。これまでのレール（v2 profile config → route-bundle）はどちらも main から消えている。旧 `route.yaml` は作業リポジトリの `legacy-routebundle/` に参照用として保存
-- イメージは git main の commit SHA ピン（Dockerfile の `SWITCHYARD_SHA`）。#268 以降のリリースがまだ存在しないため——crates.io に `switchyard-server` は未公開・PyPI は 0.1.0 止まり・`v0.2.0` タグは #268 前に main から分岐——SHA ピンが唯一の選択肢。#268 込みのタグが出たらそちらへ切替（release CI が crates を publish したら `cargo install` ベースへの簡素化も検討）。TOML は未知キーを拒否するので、SHA を上げる際は必ず `switchyard-server --config routes.toml --dry-run` で検証してから配布する
-- **judge の思考抑制は廃止。** 以前は classifier target に `extra_body = { reasoning_effort = "none", temperature = 0 }` を置いていたが、上記のモデル ID 衝突により weak tier のユーザー応答へパラメータが漏れるため、judge はプロバイダ既定で動かす形に変更（2026-08-08）。代償は判定あたり数百思考トークンと数秒のレイテンシ（session affinity により判定はセッション開始時に限られる）、および閾値際の判定の揺れ（分散プローブで 2/10 フリップ）。再較正チェック（87 判定）で `base_threshold = 0.75` は据え置きを確認済み
+- イメージは crates.io の**リリース版**を入れる（Dockerfile の `SWITCHYARD_VERSION`）。git commit ピンではない。Rust crates が publish されたのは Switchyard 0.2.0（2026-08-10）が最初で、それ以前は main の commit SHA ピンが唯一の選択肢だった。バージョンを上げる前に知っておくべきことが 2 つ。①**リリースタグは `main` から分岐している**（main は次の開発サイクルなので、追従すると未リリース版を動かすことになる）②0.2.0 は `d0b9d50b` から publish されており、**#268 が main に入る 57 分前**の状態。バージョン番号では判別できない（どちらのバイナリも `switchyard-server 0.2.0` と名乗る）。TOML は未知キーを拒否するので、バージョンを上げる際は必ず `switchyard-server --config routes.toml --dry-run` で検証してから配布する
+- **judge の思考抑制を復活（2026-08-11）。** classifier target に `extra_body = { reasoning_effort = "none", temperature = 0 }` を戻した。2026-08-08 に外したのは、上記のモデル ID 衝突で weak tier のユーザー応答へ漏れていたためだが、これは #268 が持ち込んだ回帰で、リリース版 0.2.0 はその手前にある。同一の 87 判定セットで有無を比較すると、judge の p50 は 2.2s vs 10.4s、p90 は 4.4s vs 44.5s。エージェントループ形状の行き先はどちらでも同一（30/30 weak）で、動くのは壁打ちだけ（strong 到達 9/13 vs 12/13）。その壁打ちセットは 3 者盲検で weak と strong の回答が同等に使えると判定されている。`base_threshold = 0.75` は据え置き
+- **0.2.0 の既知の上流問題**のうち週次レビューに効くもの: judge 失敗時の既定 target フォールバック・escalation の判断・`stage_router` のフォールバックについて、`/v1/stats` と `/metrics` に routing tier が記録されない（上流に修正 PR が出ている）。またクライアント切断後もバッファ済みの上流処理は続くため、キャンセルしたリクエストにも課金が発生しうる
 - ルーティングは `llm_classifier` の **capability モード**: judge が `p_solve`（weak tier がタスクを完遂する確率）を推定し、`base_threshold`（+ capability boundary 段階ごとの `threshold_step`）と比較する。現行の閾値（0.75/0.1）は 2026-08-08 に実エージェント transcript 由来の 87 判定セットで較正したもの（既定 0.5 では深い設計議論が weak に漏れる: 9/13 → 0.75 で 12/13）。調整する場合は勘で動かさず、自分の p_solve 分布を測ってから
 - judge が読むのは会話の **最初と最新の user メッセージだけ**（既定では assistant / tool ターンは不可視）。旧特徴量抽出 rubric よりセッション中盤の判定が安定しているのはこのためで、較正の主役はプロンプトではなく閾値になる
 - schema 検証に失敗した判定や、素の `content` の外に出た回答は **strong に fail-open** する。`/metrics` の `switchyard_classifier_fail_open_total` を監視面に
