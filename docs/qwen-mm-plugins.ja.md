@@ -1,13 +1,14 @@
-[English](README.md) | **日本語**
+[English](qwen-mm-plugins.md) | **日本語**
 
-# qwen-mm-plugins（実験用）
+# weak tier の目（Qwen-MM-Plugins）
 
 テキスト専用の weak tier に、ツールとして呼べる「目」を付ける。ツールを提供するのは
-[Qwen-MM-Plugins](https://github.com/QwenLM/Qwen-MM-Plugins) で、ここではその宛先を、すでに動かしている
-ルーター経由でホスト型の vision モデルに向ける。
+[Qwen-MM-Plugins](https://github.com/QwenLM/Qwen-MM-Plugins) で、ルーターが専用 route で
+ホスト型の vision モデルを提供する。
 
-**ステータス: 実験用。画像のみ。** 音声・手元の動画ファイル・`grounding` はホスト型では動かない
-（[制約](#制約)を参照）。既定のセットアップには含まれないので、使わない人には影響しない。
+**ステータス: 画像のみ。** ルーター側（`routes.toml`）は既定で配線済み。使うかどうかは
+opencode 側のオプトインで、下の MCP ブロックをマージすると有効になる。音声・手元の動画
+ファイル・`grounding` はホスト型では動かない（[制約](#制約)を参照）。
 
 ## なぜ
 
@@ -42,25 +43,65 @@ opencode
 スクリーンショットを撮って CSS のバグを特定・修正・再確認まで回した 1 セッションで、目が使ったのは
 1,626 prompt + 752 completion トークン、**約 $0.002** だった。
 
-メディア呼び出しも他のリクエストと同じく `routing.jsonl` に残り、`scripts/stats-snapshot.sh` は
-これを独立した行（`pinned:qwen3p7-plus`）で集計する。週次レビューでコストを分離できる。
+メディア呼び出しも他のリクエストと同じく `routing.jsonl` に残り、`scripts/stats-snapshot.sh` と
+`scripts/trial-report.py` はこれを独立した行（`pinned:qwen3p7-plus`）で集計する。週次レビューで
+コストを分離できる。
 
 ## セットアップ
 
-1. [`routes.snippet.toml`](routes.snippet.toml) を `routes.toml` に追記し、検証してから再起動する。
+ルーター側は配線済み —— `routes.toml` に vision target と `qwen3.7-plus` route が定義されている。
+確認は次のとおり。
 
-   ```bash
-   cat experimental/qwen-mm-plugins/routes.snippet.toml >> routes.toml
-   docker compose run --rm switchyard --config /app/routes.toml --dry-run
-   docker compose restart
+```bash
+curl -s http://127.0.0.1:4100/v1/models | grep qwen
+# → "qwen3.7-plus"
+```
+
+既存のルーターを更新する場合は `git pull && docker compose restart` だけでよい（イメージは
+変わらない）。以前 `experimental/qwen-mm-plugins/routes.snippet.toml` を `routes.toml` に追記して
+オプトインしていた場合は、先にローカルの追記分を消してから pull する —— 同じブロックが本体に
+入ったので、重複した TOML テーブルはパースに失敗する。
+
+```bash
+git checkout routes.toml && git pull
+docker compose restart
+```
+
+残るのは opencode 側だけ。
+
+1. この `mcp` ブロックを opencode の設定（グローバル `~/.config/opencode/opencode.json` か
+   プロジェクトの設定）にマージする。他の設定は変えなくてよい。
+
+   ```jsonc
+   // commit は意図的にピンしている。upstream は 2026-08-11 に capability を再編した:
+   // vision_chat / ocr / grounding は `core` の外へ移り、`omni-av` extra は消え、外部 API を
+   // 呼ぶものはすべて `api` に集まった。@main を追うと、次の再編でツール一覧が黙って空になる。
+   {
+     "mcp": {
+       "qwen-mm-plugins-api": {
+         "type": "local",
+         "command": [
+           "uvx",
+           "--from",
+           "qwen-mm-plugins[api] @ git+https://github.com/QwenLM/Qwen-MM-Plugins.git@8d6ea5a1f658260743307c52c2024ec87599fa48",
+           "qwen-mm-plugins-api",
+         ],
+         "environment": {
+           // プラグインの宛先を DashScope ではなくルーターに向ける。routes.toml の route id は
+           // プラグインが既定で要求するモデル名に一致させてある。
+           "DASHSCOPE_BASE_URL": "http://127.0.0.1:4100/v1",
+           // セルフホスト・プロキシ経由では認証は無視される。実キーはルーターが持つ。
+           "DASHSCOPE_API_KEY": "EMPTY",
+           // メディア呼び出しはチャットより遅い。既定の read timeout では足りない。
+           "QWEN_MM_CHAT_TIMEOUT": "900",
+         },
+         "enabled": true,
+       },
+     },
+   }
    ```
 
-   dry-run の一覧に、既存の route と並んで `qwen3.7-plus` が出れば成功。
-
-2. [`opencode.mcp.example.jsonc`](opencode.mcp.example.jsonc) の `mcp` ブロックを opencode の設定に
-   マージする。
-
-3. 画像について尋ねる。添付ではなく**パス**を渡す。
+2. 画像について尋ねる。添付ではなく**パス**を渡す。
 
    ```
    ./screenshot.png のレイアウト崩れの原因を、利用可能なツールで調べて
@@ -94,9 +135,10 @@ strict なエンドポイントがそれを弾くため。upstream に
 気になる場合は `AGENTS.md` に 1 行足して抑えられる。
 
 **音声や手元の動画ファイルが必要な場合**は、それらを受け付けるモデル —— 実質的にはセルフホストの Omni
-—— を目にする必要がある。route の `target` を差し替えて再起動するだけで、他は変わらない。
+—— を目にする必要がある。route 定義の `target` を差し替えて再起動するだけで、他は変わらない。
 
 ## 元に戻す
 
-手順 1 で追記した 2 ブロックを `routes.toml` から削除して再起動し、`mcp` のエントリを消す。
-バンドルの他の部分はこれらに依存していない。
+opencode 設定から `mcp` のエントリを消す —— それだけで route は何もしなくなる。ルーターのモデル一覧
+からも消したい場合は、`routes.toml` 末尾の 2 ブロック（`[targets.fw_qwen_vl]` と
+`[routes.omni-vision]`）を削除して再起動する。バンドルの他の部分はこれらに依存していない。

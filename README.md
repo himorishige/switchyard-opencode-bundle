@@ -84,7 +84,7 @@ curl -s http://127.0.0.1:4100/health
 # → {"status":"ok"}
 
 curl -s http://127.0.0.1:4100/v1/models | head
-# → auto / auto-esc / strong-only / weak-only / k3-only
+# → auto / auto-esc / strong-only / weak-only / k3-only / qwen3.7-plus
 ```
 
 Once that works, move on to configuring opencode.
@@ -227,6 +227,10 @@ Trade-offs to know before picking it:
 
 Where it shines: cost-minimal experiments (weak share is structurally maximal), and **non-interactive workloads** — cron jobs, batch pipelines, agents nobody watches live — where buffered streaming costs nothing and evidence-based escalation is exactly the failure insurance you want. To try it, pick `auto-esc` in the model picker; it is registered in `opencode.jsonc.example`.
 
+### An eye for the weak tier (Qwen-MM-Plugins)
+
+The weak tier is text-only — `deepseek-v4-flash-0731` rejects image input outright. Rather than moving the tier to a costlier vision model, the router serves a dedicated vision route (`qwen3.7-plus`) for [Qwen-MM-Plugins](https://github.com/QwenLM/Qwen-MM-Plugins) tools: they show the image to the vision model and hand the brain a text description, so the brain never sees an image and stays on the cheap model. The route ships in `routes.toml` and is inert until you add the plugin's MCP entry to opencode. Setup, costs, and limits (images only): [docs/qwen-mm-plugins.md](docs/qwen-mm-plugins.md).
+
 ## Agent Plugin (rag-kb / web-search)
 
 `plugin/team-ai-kb/` is a plugin conforming to the [Agent Plugins standard](https://agent-plugins.org/) (v1.0.0). It is optional and independent of the router, bundling two agent skills plus an MCP definition.
@@ -368,7 +372,6 @@ One improvement over the previous setup: the classifier's own calls now appear i
 ## Experimental
 
 - [`experimental/permission-judge/`](experimental/permission-judge/) — an opencode plugin that adds a Claude Code-style "smart auto mode": an LLM judge (via the router's weak tier) classifies permission requests and only safe ones are auto-approved. Ships in shadow mode (judge and log only, humans still decide) until calibration proves agreement
-- [`experimental/qwen-mm-plugins/`](experimental/qwen-mm-plugins/) — lets the text-only weak tier answer questions about images, by routing [Qwen-MM-Plugins](https://github.com/QwenLM/Qwen-MM-Plugins) tools to a hosted vision model. The brain never receives an image, so the tier stays on the cheap text model. Images only — audio and local video need a self-hosted model
 
 ## Security notes
 

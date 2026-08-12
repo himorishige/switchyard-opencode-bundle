@@ -51,6 +51,7 @@ PRICES = {
     "accounts/fireworks/models/deepseek-v4-flash-0731": (0.14, 0.028, 0.28),
     "accounts/fireworks/models/kimi-k3": (3.00, 0.30, 15.00),
     "accounts/fireworks/models/minimax-m3": (0.30, 0.059, 1.20),
+    "accounts/fireworks/models/qwen3p7-plus": (0.40, 0.08, 1.60),
 }
 STRONG_PRICE = PRICES["accounts/fireworks/models/kimi-k3"]
 

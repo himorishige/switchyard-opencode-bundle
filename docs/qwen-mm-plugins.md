@@ -1,14 +1,14 @@
-**English** | [日本語](README.ja.md)
+**English** | [日本語](qwen-mm-plugins.ja.md)
 
-# qwen-mm-plugins (experimental)
+# An eye for the weak tier (Qwen-MM-Plugins)
 
 Let the text-only weak tier answer questions about images, by giving it an "eye" it can call
 as a tool. [Qwen-MM-Plugins](https://github.com/QwenLM/Qwen-MM-Plugins) provides the tools;
-this directory wires them to a hosted vision model through the router you already run.
+the router serves them a hosted vision model on a dedicated route.
 
-**Status: experimental. Images only.** Audio, local video files, and the `grounding` tool do
-not work through a hosted endpoint — see [Limits](#limits). Not part of the default setup;
-adding it changes nothing for anyone who does not opt in.
+**Status: images only.** The router side (`routes.toml`) ships by default; using it is
+opt-in on the opencode side — merge the MCP block below. Audio, local video files, and the
+`grounding` tool do not work through a hosted endpoint — see [Limits](#limits).
 
 ## Why
 
@@ -46,26 +46,66 @@ session that took a screenshot, diagnosed a CSS bug, fixed it and verified the f
 1,626 prompt + 752 completion tokens on the eye — about **$0.002**.
 
 Media calls appear in `routing.jsonl` like any other request, and
-`scripts/stats-snapshot.sh` reports them on their own line (`pinned:qwen3p7-plus`), so the
-cost stays separable in the weekly review.
+`scripts/stats-snapshot.sh` and `scripts/trial-report.py` report them on their own line
+(`pinned:qwen3p7-plus`), so the cost stays separable in the weekly review.
 
 ## Setup
 
-1. Append [`routes.snippet.toml`](routes.snippet.toml) to your `routes.toml`, then validate
-   and restart:
+The router side is already wired — `routes.toml` defines the vision target and the
+`qwen3.7-plus` route. Verify:
 
-   ```bash
-   cat experimental/qwen-mm-plugins/routes.snippet.toml >> routes.toml
-   docker compose run --rm switchyard --config /app/routes.toml --dry-run
-   docker compose restart
+```bash
+curl -s http://127.0.0.1:4100/v1/models | grep qwen
+# → "qwen3.7-plus"
+```
+
+If you are updating an existing router, `git pull && docker compose restart` is enough (the
+image is unchanged). If you had opted in earlier by appending
+`experimental/qwen-mm-plugins/routes.snippet.toml` to your `routes.toml`, drop that local
+copy first — the same blocks are now committed, and duplicate TOML tables fail to parse:
+
+```bash
+git checkout routes.toml && git pull
+docker compose restart
+```
+
+What remains is the opencode side:
+
+1. Merge this `mcp` block into your opencode config (global
+   `~/.config/opencode/opencode.json` or a project-level one). Nothing else in your config
+   needs to change.
+
+   ```jsonc
+   // The commit is pinned on purpose. Upstream reorganised the capabilities on 2026-08-11:
+   // vision_chat / ocr / grounding moved out of `core`, the `omni-av` extra was removed, and
+   // everything that calls an external API now lives in `api`. Tracking @main means the next
+   // reshuffle silently empties your toolset.
+   {
+     "mcp": {
+       "qwen-mm-plugins-api": {
+         "type": "local",
+         "command": [
+           "uvx",
+           "--from",
+           "qwen-mm-plugins[api] @ git+https://github.com/QwenLM/Qwen-MM-Plugins.git@8d6ea5a1f658260743307c52c2024ec87599fa48",
+           "qwen-mm-plugins-api",
+         ],
+         "environment": {
+           // Point the plugin at the router, not at DashScope. The route id in
+           // routes.toml matches the model name the plugin asks for by default.
+           "DASHSCOPE_BASE_URL": "http://127.0.0.1:4100/v1",
+           // Self-hosted and proxied endpoints ignore auth; the router holds the real key.
+           "DASHSCOPE_API_KEY": "EMPTY",
+           // Media calls are slower than chat. The default read timeout is too tight.
+           "QWEN_MM_CHAT_TIMEOUT": "900",
+         },
+         "enabled": true,
+       },
+     },
+   }
    ```
 
-   The dry-run should list `qwen3.7-plus` alongside your existing routes.
-
-2. Merge the `mcp` block from
-   [`opencode.mcp.example.jsonc`](opencode.mcp.example.jsonc) into your opencode config.
-
-3. Ask for something in an image, giving a **path** rather than attaching it:
+2. Ask for something in an image, giving a **path** rather than attaching it:
 
    ```
    ./screenshot.png のレイアウト崩れの原因を、利用可能なツールで調べて
@@ -101,10 +141,12 @@ the model falls back to `vision_chat` and still completes the task; the wasted c
 only cost. Add a line to your `AGENTS.md` if you would rather it not try.
 
 **If you need audio or local video files**, the eye has to be a model that accepts them —
-in practice a self-hosted Omni model. Swap `target` in the route snippet and restart; nothing
-else changes.
+in practice a self-hosted Omni model. Swap `target` in the route definition and restart;
+nothing else changes.
 
 ## Rollback
 
-Delete the two blocks added in step 1 from `routes.toml`, restart, and remove the `mcp` entry.
+Remove the `mcp` entry from your opencode config — without it the route is inert. If you
+also want the route out of the router's model list, delete the two blocks
+(`[targets.fw_qwen_vl]` and `[routes.omni-vision]`) at the end of `routes.toml` and restart.
 Nothing else in the bundle depends on them.
