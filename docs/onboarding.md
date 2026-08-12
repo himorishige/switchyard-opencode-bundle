@@ -18,6 +18,7 @@ Most of the elapsed time is waiting — for the image build and for GCP.
 | 5   | Agent Plugin (team-ai-kb)                    | README, "Agent Plugin"                                 | 5 min     |
 | 6   | Web search key                               | [web-search-onboarding.md](./web-search-onboarding.md) | 5–15 min  |
 | 7   | Verification checklist                       | This document                                          | 5 min     |
+| –   | (Optional) An eye for the weak tier (images) | [qwen-mm-plugins.md](./qwen-mm-plugins.md)             | 5 min     |
 
 Steps 3 and 4 are independent of the router, so the image build in step 1 is a good time to do them.
 
@@ -90,11 +91,13 @@ EOF
 
 ## 5. Agent Plugin (team-ai-kb)
 
-Complete "First-time setup (all clients)" under "Agent Plugin (rag-kb / web-search)" in the README,
-then continue to the section for your client (opencode / Claude Code / Codex CLI).
+Complete ["First-time setup (all clients)"](../README.md#first-time-setup-all-clients) under
+["Agent Plugin (rag-kb / web-search)"](../README.md#agent-plugin-rag-kb--web-search) in the README,
+then continue to the section for your client ([opencode](../README.md#with-opencode) /
+[Claude Code](../README.md#with-claude-code) / [Codex CLI](../README.md#with-codex-cli)).
 
-- For the endpoint address you fill in after copying `mcp.json.example` to `mcp.json`, follow your
-  team's instructions
+- For the endpoint address you fill in after copying `mcp.json.example` to `mcp.json` during the
+  first-time setup, follow your team's instructions
 
 ## 6. Web search key
 
@@ -106,14 +109,14 @@ OpenAI, the API excludes your data from training by default.
 
 ## 7. Verification checklist
 
-| Check                 | Command                                           | Expected                                            |
-| --------------------- | ------------------------------------------------- | --------------------------------------------------- |
-| Router                | `curl -s http://127.0.0.1:4100/health`            | `{"status":"ok"}`                                   |
-| Route list            | `curl -s http://127.0.0.1:4100/v1/models`         | auto / auto-esc / strong-only / weak-only / k3-only |
-| opencode              | `opencode run -m switchyard/auto "hello"`         | a response comes back                               |
-| AGENTS.md             | `ls ~/.config/opencode/AGENTS.md`                 | the file exists                                     |
-| Environment variables | `env \| grep OPENCODE_`                           | the values from step 3                              |
-| Web search            | the verification step in web-search-onboarding.md | an answer, `Sources:`, and a stats line             |
+| Check                 | Command                                           | Expected                                                           |
+| --------------------- | ------------------------------------------------- | ------------------------------------------------------------------ |
+| Router                | `curl -s http://127.0.0.1:4100/health`            | `{"status":"ok"}`                                                  |
+| Route list            | `curl -s http://127.0.0.1:4100/v1/models`         | auto / auto-esc / strong-only / weak-only / k3-only / qwen3.7-plus |
+| opencode              | `opencode run -m switchyard/auto "hello"`         | a response comes back                                              |
+| AGENTS.md             | `ls ~/.config/opencode/AGENTS.md`                 | the file exists                                                    |
+| Environment variables | `env \| grep OPENCODE_`                           | the values from step 3                                             |
+| Web search            | the verification step in web-search-onboarding.md | an answer, `Sources:`, and a stats line                            |
 
 - After a long idle period the first call can take tens of seconds because of a cold start (a few
   seconds from the second call onward). Adding `--max-time` to your connectivity checks makes it

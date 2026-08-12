@@ -84,7 +84,7 @@ curl -s http://127.0.0.1:4100/health
 # → {"status":"ok"}
 
 curl -s http://127.0.0.1:4100/v1/models | head
-# → auto / auto-esc / strong-only / weak-only / k3-only が並ぶ
+# → auto / auto-esc / strong-only / weak-only / k3-only / qwen3.7-plus が並ぶ
 ```
 
 起動できたら、次の「opencode 側の設定」へ進みます。
@@ -227,6 +227,10 @@ id = "accounts/fireworks/models/deepseek-v4-pro"
 
 向いている場面: コスト最小の実験（weak 比率が構造的に最大）と、**非対話ワークロード**——cron ジョブ・バッチ・画面を見ていないエージェント——です。バッファリングの影響がなく、証拠ベースの昇格がそのまま失敗保険として効きます。試すにはモデルピッカーで `auto-esc` を選ぶだけです（`opencode.jsonc.example` に登録済み）。
 
+### weak tier の目（Qwen-MM-Plugins）
+
+weak tier はテキスト専用です——`deepseek-v4-flash-0731` は画像入力を拒否します。tier ごと vision 対応モデルに替えるのではなく、ルーターが [Qwen-MM-Plugins](https://github.com/QwenLM/Qwen-MM-Plugins) のツール向けに専用の vision route（`qwen3.7-plus`）を提供します。ツールが画像を vision モデルに見せ、脳にはテキストの説明が渡るので、脳は画像を一度も受け取らず安いモデルのままです。route は `routes.toml` に同梱済みで、opencode 側にプラグインの MCP エントリを足すまでは何もしません。セットアップ・コスト・制約（画像のみ）は [docs/qwen-mm-plugins.ja.md](docs/qwen-mm-plugins.ja.md) を参照してください。
+
 ## Agent Plugin（rag-kb / web-search）
 
 `plugin/team-ai-kb/` は [Agent Plugins 標準](https://agent-plugins.org/)（v1.0.0）準拠のプラグインです。ルーターとは独立したオプションで、エージェント拡張 2 本 + MCP 定義を同梱しています。
@@ -362,7 +366,6 @@ curl -s http://127.0.0.1:4100/health
 ## 実験用
 
 - [`experimental/permission-judge/`](experimental/permission-judge/) — Claude Code 風の「賢い auto モード」を足す opencode プラグイン。LLM judge（ルーターの weak tier 経由）が permission リクエストの安全性を都度判定し、安全なものだけ自動承認する。較正で一致率が裏づけされるまでは shadow モード（判定・ログのみ、判断は人間）で出荷
-- [`experimental/qwen-mm-plugins/`](experimental/qwen-mm-plugins/) — テキスト専用の weak tier に画像を扱わせる。[Qwen-MM-Plugins](https://github.com/QwenLM/Qwen-MM-Plugins) のツールをホスト型 vision モデルへルーティングする構成で、脳は画像を一度も受け取らないので tier は安いテキストモデルのまま。画像のみ対応 —— 音声と手元の動画にはセルフホストのモデルが要る
 
 ## セキュリティノート
 
