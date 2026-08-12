@@ -17,6 +17,7 @@
 | 5   | Agent Plugin（team-ai-kb）導入   | README「Agent Plugin」                                       | 5 分      |
 | 6   | web 検索キー                     | [web-search-onboarding.ja.md](./web-search-onboarding.ja.md) | 5〜15 分  |
 | 7   | 動作確認チェックリスト           | 本ドキュメント                                               | 5 分      |
+| –   | （任意）weak tier の目（画像）   | [qwen-mm-plugins.ja.md](./qwen-mm-plugins.ja.md)             | 5 分      |
 
 手順 3・4 はルーターと独立しているので、手順 1 のビルド待ちの間に済ませるのがおすすめです。
 
@@ -86,10 +87,13 @@ EOF
 
 ## 5. Agent Plugin（team-ai-kb）
 
-README「Agent Plugin（rag-kb / web-search）」の「初期設定（共通・初回のみ）」を済ませてから、
-使っているクライアント（opencode / Claude Code / Codex CLI）の節に進んでください。
+README「[Agent Plugin（rag-kb / web-search）](../README.ja.md#agent-pluginrag-kb--web-search)」の
+「[初期設定（共通・初回のみ）](../README.ja.md#初期設定共通初回のみ)」を済ませてから、
+使っているクライアント（[opencode](../README.ja.md#opencode-で使う) /
+[Claude Code](../README.ja.md#claude-code-で使う) / [Codex CLI](../README.ja.md#codex-cli-で使う)）の
+節に進んでください。
 
-- `mcp.json.example → mcp.json` のコピー後に書き換える接続先アドレスは、チームの案内を参照してください
+- 初期設定で `mcp.json.example → mcp.json` をコピーした後に書き換える接続先アドレスは、チームの案内を参照してください
 
 ## 6. web 検索キー
 
@@ -100,14 +104,14 @@ README「Agent Plugin（rag-kb / web-search）」の「初期設定（共通・�
 
 ## 7. 動作確認チェックリスト
 
-| 確認       | コマンド                                       | 期待する結果                                        |
-| ---------- | ---------------------------------------------- | --------------------------------------------------- |
-| ルーター   | `curl -s http://127.0.0.1:4100/health`         | `{"status":"ok"}`                                   |
-| ルート一覧 | `curl -s http://127.0.0.1:4100/v1/models`      | auto / auto-esc / strong-only / weak-only / k3-only |
-| opencode   | `opencode run -m switchyard/auto "こんにちは"` | 応答が返る                                          |
-| AGENTS.md  | `ls ~/.config/opencode/AGENTS.md`              | ファイルが存在する                                  |
-| 環境変数   | `env \| grep OPENCODE_`                        | 手順 3 の値が並ぶ                                   |
-| web 検索   | web-search-onboarding.ja.md の動作確認         | 回答 + `Sources:` + 統計行                          |
+| 確認       | コマンド                                       | 期待する結果                                                       |
+| ---------- | ---------------------------------------------- | ------------------------------------------------------------------ |
+| ルーター   | `curl -s http://127.0.0.1:4100/health`         | `{"status":"ok"}`                                                  |
+| ルート一覧 | `curl -s http://127.0.0.1:4100/v1/models`      | auto / auto-esc / strong-only / weak-only / k3-only / qwen3.7-plus |
+| opencode   | `opencode run -m switchyard/auto "こんにちは"` | 応答が返る                                                         |
+| AGENTS.md  | `ls ~/.config/opencode/AGENTS.md`              | ファイルが存在する                                                 |
+| 環境変数   | `env \| grep OPENCODE_`                        | 手順 3 の値が並ぶ                                                  |
+| web 検索   | web-search-onboarding.ja.md の動作確認         | 回答 + `Sources:` + 統計行                                         |
 
 - 長時間アイドル後の初回コールはコールドスタートで数十秒かかることがあります（2 回目からは数秒）。
   疎通確認のコマンドには `--max-time` を付けると原因の切り分けが楽になります
