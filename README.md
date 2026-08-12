@@ -344,6 +344,15 @@ Weekly, or on whatever cadence you choose, run one command:
 
 It saves an aggregate JSON plus the per-request log (JSONL) into `stats-out/`, stamped with the date and your username, and prints a per-route summary of request and token counts. Submit those two files however your project has arranged it (upload to a shared folder, for example).
 
+To merge snapshots collected from several members into one usage report — per-user and team-wide token/cost tables, cache-hit rate, and a strong-pinned counterfactual — run:
+
+```bash
+./scripts/trial-report.py member-uploads/                 # any mix of files and directories
+./scripts/trial-report.py --since 2026-09-01 --until 2026-09-30
+```
+
+Files keep their `routing-<user>-<stamp>.jsonl` names from the snapshot script, so attribution is automatic, and overlapping snapshots from the same user are deduped line by line. Models without a known price are excluded from cost and reported loudly instead of silently under-counting.
+
 To look at the raw surfaces yourself:
 
 | Surface                 | Command                                                                 | Contents                                                                                         |
