@@ -361,7 +361,7 @@ curl -s http://127.0.0.1:4100/health
 
 旧構成からの改善が 1 点: classifier 自身のコールが JSONL に `tier="classifier"` で記録されるようになり、これまで不可視だったルーティング判定のコストが週次サマリーに独立行で出ます。
 
-**使用量・コストの正**: [Fireworks ダッシュボード](https://app.fireworks.ai/)のモデル別使用量を見てください。strong（kimi-k3）と weak（deepseek-v4-flash-0731）は別モデルなので、**モデル別使用量がそのまま tier 分布 × コスト**です。これが削減効果レポートの材料になります。上の stats はルーティング内訳の分析用です。
+**使用量・コストの正**: [Fireworks ダッシュボード](https://app.fireworks.ai/)のモデル別使用量を見てください。strong（kimi-k3）と weak（deepseek-v4-flash-0731）は別モデルなので、**モデル別使用量がそのまま tier 分布 × コスト**です。これが削減効果レポートの材料になります。目（[qwen3p7-plus](docs/qwen-mm-plugins.ja.md)）のメディア呼び出しも、ダッシュボードでは独立したモデル行、ローカル集計では `pinned:qwen3p7-plus` の独立行になるため、tier 分布と混ざりません。上の stats はルーティング内訳の分析用です。
 
 ## 実験用
 

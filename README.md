@@ -367,7 +367,7 @@ To look at the raw surfaces yourself:
 
 One improvement over the previous setup: the classifier's own calls now appear in the JSONL with `tier="classifier"`, so the routing overhead cost — invisible before — shows up in the weekly summary as its own row.
 
-**The source of truth for usage and cost** is per-model usage on the [Fireworks dashboard](https://app.fireworks.ai/). Since strong (kimi-k3) and weak (deepseek-v4-flash-0731) are different models, **per-model usage is exactly your tier distribution multiplied by cost** — that is what a savings report is built from. The stats above are for analyzing the routing breakdown.
+**The source of truth for usage and cost** is per-model usage on the [Fireworks dashboard](https://app.fireworks.ai/). Since strong (kimi-k3) and weak (deepseek-v4-flash-0731) are different models, **per-model usage is exactly your tier distribution multiplied by cost** — that is what a savings report is built from. Media calls to the eye ([qwen3p7-plus](docs/qwen-mm-plugins.md)) get their own model row on the dashboard and their own `pinned:qwen3p7-plus` row in the local summaries, so they never blur the tier split. The stats above are for analyzing the routing breakdown.
 
 ## Experimental
 
