@@ -235,11 +235,11 @@ weak tier はテキスト専用です——`deepseek-v4-flash-0731` は画像入
 
 `plugin/team-ai-kb/` は [Agent Plugins 標準](https://agent-plugins.org/)（v1.0.0）準拠のプラグインです。ルーターとは独立したオプションで、エージェント拡張 2 本 + MCP 定義を同梱しています。
 
-| コンポーネント                              | 内容                                                                                      | 前提                                                                                              |
-| ------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| skill `rag-kb`                              | チーム共通ナレッジ検索（NVIDIA RAG Blueprint の MCP）の使い方ガイド                       | RAG サービスへのプライベート網到達 + 下記 MCP 登録                                                |
-| skill `web-search`（+ `scripts/search.py`） | Gemini + Google Search grounding の web 検索。各自の API キーで直接呼ぶ（中間サーバなし） | `GEMINI_API_KEY`。発行手順 = [docs/web-search-onboarding.ja.md](docs/web-search-onboarding.ja.md) |
-| `mcp.json`                                  | `nvidia-rag`（streamable HTTP）の MCP サーバ定義                                          | 下記の初期設定                                                                                    |
+| コンポーネント                              | 内容                                                                                                                  | 前提                                                                                                                      |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| skill `rag-kb`                              | チーム共通ナレッジ検索（NVIDIA RAG Blueprint の MCP）の使い方ガイド                                                   | RAG サービスへのプライベート網到達 + 下記 MCP 登録                                                                        |
+| skill `web-search`（+ `scripts/search.py`） | Gemini / OpenAI 両対応の web 検索。設定済みのキーからバックエンドを自動選択し、各自のキーで直接呼ぶ（中間サーバなし） | `GEMINI_API_KEY` または `OPENAI_API_KEY`。発行手順 = [docs/web-search-onboarding.ja.md](docs/web-search-onboarding.ja.md) |
+| `mcp.json`                                  | `nvidia-rag`（streamable HTTP）の MCP サーバ定義                                                                      | 下記の初期設定                                                                                                            |
 
 ### 初期設定（共通・初回のみ）
 
@@ -373,7 +373,7 @@ curl -s http://127.0.0.1:4100/health
 - ネイティブ Rust サーバーには**リクエスト収集機構がありません**（旧 Python CLI の Intake sink はこのサーバーに存在しません）。リクエスト本文が出ていく先は設定した Fireworks エンドポイントだけです
 - ルーティングログ（`/app/logs/routing.jsonl`）は Docker named volume（`switchyard-logs`）内に留まり、ホスト側には `stats-snapshot.sh` / `docker cp` で取り出したときだけ出ます。中身はルーティング判定とトークン数のみで、プロンプト本文は含まれません
 - web 検索の安全策（exa.ai 無効化）は本ルーターの管轄外です。web 検索経由の情報送信を絞りたい場合は、opencode 側で先に適用してください（「前提」参照）
-- web-search skill のクエリは、各自のキーで Gemini API（Google）に直接送信されます。学習不使用は**課金有効 GCP プロジェクトのキーであることが条件**です（[docs/web-search-onboarding.ja.md](docs/web-search-onboarding.ja.md)）。機密語をクエリに入れない規律は SKILL.md に記載しています
+- web-search skill のクエリは、各自のキーで検索バックエンド（Gemini API または OpenAI API）に直接送信されます。学習不使用の条件はバックエンドで異なります——Gemini は**課金有効 GCP プロジェクトのキーであることが条件**（free tier のキーは学習に利用されます）、OpenAI は API 既定で学習不使用です（[docs/web-search-onboarding.ja.md](docs/web-search-onboarding.ja.md)）。機密語をクエリに入れない規律は SKILL.md に記載しています
 - `nvidia-rag` MCP は読み取り専用の公開面（search / generate 等 5 tools）への接続を前提としています。削除系 tools を含む管理面をプライベート網に公開しない構成は、RAG サービス側の責務です
 - 脚注: 平文 `.env` をどうしても避けたい場合は 1Password CLI の `op run` + secret reference でも起動できますが、Docker はコンテナ metadata に env を平文保存するため（`docker inspect` で見えます）利得は限定的です。本バンドルの標準は `.env` + `chmod 600` です
 
