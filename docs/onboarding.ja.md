@@ -40,7 +40,7 @@ README「opencode 側の設定」の A（そのまま上書き）/ B（既存カ
 ## 3. シェル環境変数（strict-privacy）
 
 設定ファイル（手順 2）に含まれるのは config 側だけです。環境変数側の無効化フラグは
-各自のシェル rc（`~/.zshrc` 等）に設定します。
+各自のシェルの設定ファイル（`~/.zshrc`。bash の場合は `~/.bashrc`）に設定します。
 
 ```sh
 # opencode-with-strict-privacy 推奨の環境変数

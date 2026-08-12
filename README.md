@@ -103,7 +103,7 @@ cp opencode.jsonc.example ~/.config/opencode/opencode.json
 ```
 
 - If you use the `opencode.jsonc` filename instead, overwrite that file. Do not keep both `.json` and `.jsonc` — the precedence between them is not documented officially
-- The environment-variable half of strict-privacy (`OPENCODE_ENABLE_EXA=0` and friends) is not part of this file. Set those in your shell rc separately
+- The environment-variable half of strict-privacy (`OPENCODE_ENABLE_EXA=0` and friends) is not part of this file. Set those in your shell startup file (`~/.zshrc` or similar) separately
 
 ### B. Merge into an existing config
 

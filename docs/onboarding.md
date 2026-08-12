@@ -42,7 +42,7 @@ path B (merge into your existing config) from "Configuring opencode" in the READ
 ## 3. Shell environment variables (strict-privacy)
 
 Step 2 covers only the config-file half of strict-privacy. The environment-variable half goes into
-your own shell rc (`~/.zshrc` or similar).
+your own shell startup file (`~/.zshrc`, or `~/.bashrc` for bash).
 
 ```sh
 # environment variables recommended by opencode-with-strict-privacy

@@ -15,7 +15,7 @@
   // --- recommended global settings from opencode-with-strict-privacy ---
   // https://github.com/cm-dyoshikawa/opencode-with-strict-privacy
   // The environment-variable half (OPENCODE_ENABLE_EXA=0 and friends) is not
-  // part of this file. Set those in your shell rc (~/.zshrc etc.) separately.
+  // part of this file. Set those in your shell startup file (~/.zshrc, or ~/.bashrc for bash) separately.
 
   // Disable generation of shareable conversation links
   "share": "disabled",

@@ -103,7 +103,7 @@ cp opencode.jsonc.example ~/.config/opencode/opencode.json
 ```
 
 - `opencode.jsonc` のファイル名で運用している場合は、そのファイルに上書きしてください（`.json` と `.jsonc` を両方置いたときの優先順位は公式に明記されていないため、二重に置かないこと）
-- strict-privacy の環境変数側の設定（`OPENCODE_ENABLE_EXA=0` 等）はこのファイルには含まれません。シェル rc への設定は別途済ませてください
+- strict-privacy の環境変数側の設定（`OPENCODE_ENABLE_EXA=0` 等）はこのファイルには含まれません。シェルの設定ファイル（`~/.zshrc` など）への設定は別途済ませてください
 
 ### B. 既存のカスタム設定にマージする
 
