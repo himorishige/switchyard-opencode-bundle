@@ -235,11 +235,11 @@ weak tier はテキスト専用です——`deepseek-v4-flash-0731` は画像入
 
 `plugin/team-ai-kb/` は [Agent Plugins 標準](https://agent-plugins.org/)（v1.0.0）準拠のプラグインです。ルーターとは独立したオプションで、エージェント拡張 2 本 + MCP 定義を同梱しています。
 
-| コンポーネント                              | 内容                                                                                      | 前提                                                                                              |
-| ------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| skill `rag-kb`                              | チーム共通ナレッジ検索（NVIDIA RAG Blueprint の MCP）の使い方ガイド                       | RAG サービスへのプライベート網到達 + 下記 MCP 登録                                                |
-| skill `web-search`（+ `scripts/search.py`） | Gemini + Google Search grounding の web 検索。各自の API キーで直接呼ぶ（中間サーバなし） | `GEMINI_API_KEY`。発行手順 = [docs/web-search-onboarding.ja.md](docs/web-search-onboarding.ja.md) |
-| `mcp.json`                                  | `nvidia-rag`（streamable HTTP）の MCP サーバ定義                                          | 下記の初期設定                                                                                    |
+| コンポーネント                              | 内容                                                                                                                  | 前提                                                                                                                      |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| skill `rag-kb`                              | チーム共通ナレッジ検索（NVIDIA RAG Blueprint の MCP）の使い方ガイド                                                   | RAG サービスへのプライベート網到達 + 下記 MCP 登録                                                                        |
+| skill `web-search`（+ `scripts/search.py`） | Gemini / OpenAI 両対応の web 検索。設定済みのキーからバックエンドを自動選択し、各自のキーで直接呼ぶ（中間サーバなし） | `GEMINI_API_KEY` または `OPENAI_API_KEY`。発行手順 = [docs/web-search-onboarding.ja.md](docs/web-search-onboarding.ja.md) |
+| `mcp.json`                                  | `nvidia-rag`（streamable HTTP）の MCP サーバ定義                                                                      | 下記の初期設定                                                                                                            |
 
 ### 初期設定（共通・初回のみ）
 
@@ -361,7 +361,7 @@ curl -s http://127.0.0.1:4100/health
 
 旧構成からの改善が 1 点: classifier 自身のコールが JSONL に `tier="classifier"` で記録されるようになり、これまで不可視だったルーティング判定のコストが週次サマリーに独立行で出ます。
 
-**使用量・コストの正**: [Fireworks ダッシュボード](https://app.fireworks.ai/)のモデル別使用量を見てください。strong（kimi-k3）と weak（deepseek-v4-flash-0731）は別モデルなので、**モデル別使用量がそのまま tier 分布 × コスト**です。これが削減効果レポートの材料になります。上の stats はルーティング内訳の分析用です。
+**使用量・コストの正**: [Fireworks ダッシュボード](https://app.fireworks.ai/)のモデル別使用量を見てください。strong（kimi-k3）と weak（deepseek-v4-flash-0731）は別モデルなので、**モデル別使用量がそのまま tier 分布 × コスト**です。これが削減効果レポートの材料になります。目（[qwen3p7-plus](docs/qwen-mm-plugins.ja.md)）のメディア呼び出しも、ダッシュボードでは独立したモデル行、ローカル集計では `pinned:qwen3p7-plus` の独立行になるため、tier 分布と混ざりません。上の stats はルーティング内訳の分析用です。
 
 ## 実験用
 
@@ -373,20 +373,6 @@ curl -s http://127.0.0.1:4100/health
 - ネイティブ Rust サーバーには**リクエスト収集機構がありません**（旧 Python CLI の Intake sink はこのサーバーに存在しません）。リクエスト本文が出ていく先は設定した Fireworks エンドポイントだけです
 - ルーティングログ（`/app/logs/routing.jsonl`）は Docker named volume（`switchyard-logs`）内に留まり、ホスト側には `stats-snapshot.sh` / `docker cp` で取り出したときだけ出ます。中身はルーティング判定とトークン数のみで、プロンプト本文は含まれません
 - web 検索の安全策（exa.ai 無効化）は本ルーターの管轄外です。web 検索経由の情報送信を絞りたい場合は、opencode 側で先に適用してください（「前提」参照）
-- web-search skill のクエリは、各自のキーで Gemini API（Google）に直接送信されます。学習不使用は**課金有効 GCP プロジェクトのキーであることが条件**です（[docs/web-search-onboarding.ja.md](docs/web-search-onboarding.ja.md)）。機密語をクエリに入れない規律は SKILL.md に記載しています
+- web-search skill のクエリは、各自のキーで検索バックエンド（Gemini API または OpenAI API）に直接送信されます。学習不使用の条件はバックエンドで異なります——Gemini は**課金有効 GCP プロジェクトのキーであることが条件**（free tier のキーは学習に利用されます）、OpenAI は API 既定で学習不使用です（[docs/web-search-onboarding.ja.md](docs/web-search-onboarding.ja.md)）。機密語をクエリに入れない規律は SKILL.md に記載しています
 - `nvidia-rag` MCP は読み取り専用の公開面（search / generate 等 5 tools）への接続を前提としています。削除系 tools を含む管理面をプライベート網に公開しない構成は、RAG サービス側の責務です
 - 脚注: 平文 `.env` をどうしても避けたい場合は 1Password CLI の `op run` + secret reference でも起動できますが、Docker はコンテナ metadata に env を平文保存するため（`docker inspect` で見えます）利得は限定的です。本バンドルの標準は `.env` + `chmod 600` です
-
-## 実装メモ（メンテナ向け）
-
-- ルーターは **standalone のネイティブ Rust サーバー**（`switchyard-server --config routes.toml`）。上流 #268（2026-08-07）が Python のルーティング実装を削除したため、route-bundle 形式（`type: deterministic`）から移行した。これまでのレール（v2 profile config → route-bundle）はどちらも main から消えている。旧 `route.yaml` は作業リポジトリの `legacy-routebundle/` に参照用として保存
-- イメージは crates.io の**リリース版**を入れる（Dockerfile の `SWITCHYARD_VERSION`）。git commit ピンではない。Rust crates が publish されたのは Switchyard 0.2.0（2026-08-10）が最初で、それ以前は main の commit SHA ピンが唯一の選択肢だった。バージョンを上げる前に知っておくべきことが 2 つ。①**リリースタグは `main` から分岐している**（main は次の開発サイクルなので、追従すると未リリース版を動かすことになる）②0.2.0 は `d0b9d50b` から publish されており、**#268 が main に入る 57 分前**の状態。バージョン番号では判別できない（どちらのバイナリも `switchyard-server 0.2.0` と名乗る）。TOML は未知キーを拒否するので、バージョンを上げる際は必ず `switchyard-server --config routes.toml --dry-run` で検証してから配布する
-- **judge の思考抑制を復活（2026-08-11）。** classifier target に `extra_body = { reasoning_effort = "none", temperature = 0 }` を戻した。2026-08-08 に外したのは、上記のモデル ID 衝突で weak tier のユーザー応答へ漏れていたためだが、これは #268 が持ち込んだ回帰で、リリース版 0.2.0 はその手前にある。同一の 87 判定セットで有無を比較すると、judge の p50 は 2.2s vs 10.4s、p90 は 4.4s vs 44.5s。エージェントループ形状の行き先はどちらでも同一（30/30 weak）で、動くのは壁打ちだけ（strong 到達 9/13 vs 12/13）。その壁打ちセットは 3 者盲検で weak と strong の回答が同等に使えると判定されている。`base_threshold = 0.75` は据え置き
-- **0.2.0 の既知の上流問題**のうち週次レビューに効くもの: judge 失敗時の既定 target フォールバック・escalation の判断・`stage_router` のフォールバックについて、`/v1/stats` と `/metrics` に routing tier が記録されない（上流に修正 PR が出ている）。またクライアント切断後もバッファ済みの上流処理は続くため、キャンセルしたリクエストにも課金が発生しうる
-- ルーティングは `llm_classifier` の **capability モード**: judge が `p_solve`（weak tier がタスクを完遂する確率）を推定し、`base_threshold`（+ capability boundary 段階ごとの `threshold_step`）と比較する。現行の閾値（0.75/0.1）は 2026-08-08 に実エージェント transcript 由来の 87 判定セットで較正したもの（既定 0.5 では深い設計議論が weak に漏れる: 9/13 → 0.75 で 12/13）。調整する場合は勘で動かさず、自分の p_solve 分布を測ってから
-- judge が読むのは会話の **最初と最新の user メッセージだけ**（既定では assistant / tool ターンは不可視）。旧特徴量抽出 rubric よりセッション中盤の判定が安定しているのはこのためで、較正の主役はプロンプトではなく閾値になる
-- schema 検証に失敗した判定や、素の `content` の外に出た回答は **strong に fail-open** する。`/metrics` の `switchyard_classifier_fail_open_total` を監視面に
-- session affinity は `session_affinity = true` + `message_hash_fallback = true`。opencode はサーバーが解釈するセッションヘッダを送るが、送らないクライアントは最初の user メッセージのハッシュでカバーされる。割り当てはプロセスローカル（再起動でリセット）、上流実装で 4096 セッション上限
-- ランタイムは uid 1000 で実行（旧 Python イメージの最初のユーザーと一致）。`switchyard-logs` named volume の `routing.jsonl` 履歴は chown なしで移行をまたいで引き継がれる
-- Dockerfile の `APT::Sandbox::User=root` は colima/lima の既知の癖（`_apt` サンドボックスユーザーが DL 済みパッケージリストを読めず、gpgv 手動検証は通るのに apt が「invalid signature」を報告する）への回避策。Docker Desktop / Linux では無害
-- 覚えておく価値のある上流の変更点: `/v1/routing/stats` は `/v1/stats` に変更 / レスポンスヘッダは `x-model-router-selected-model` と `x-model-router-rationale` / routing ログのセッションキーは affinity が見るヘッダと別系統（上流 known issue #7）
