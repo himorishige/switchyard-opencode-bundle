@@ -52,7 +52,16 @@ your context cleaner. Use `generate` only when the deliverable is the cited answ
 
 ## Collection catalog (maintained by administrators)
 
-| Collection               | Contents                                    | Updated   |
-| ------------------------ | ------------------------------------------- | --------- |
-| (example) devio-articles | Archive of the team's published articles    | Weekly    |
-| (example) nvidia-docs    | Excerpts from NVIDIA official documentation | As needed |
+| Collection      | Contents                                                                       | Updated                |
+| --------------- | ------------------------------------------------------------------------------ | ---------------------- |
+| `personal_wiki` | Distilled technical wiki, meeting/research notes, per-project decision ledgers | Daily (06:30 JST cron) |
+
+`personal_wiki` is a single collection on purpose (splitting would force a per-query collection
+guess, and a wrong `collection_names` returns zero hits indistinguishable from "no such
+knowledge"). Instead, the `document_name` prefix tells you what kind of document a hit is:
+
+| `document_name` shape            | Source                                                         |
+| -------------------------------- | -------------------------------------------------------------- |
+| bare filename (`<slug>.md`)      | llmwiki page (distilled technical knowledge, ADR pages)        |
+| `<dir>--...--<file>.md`          | knowledge notes (meetings, daily logs, research, study guides) |
+| `projects--<slug>--decisions.md` | a project's decision ledger (ADR-lite entries, dated headings) |
