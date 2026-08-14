@@ -116,12 +116,13 @@ the rest of the router.
 
 ### A note on attachments
 
-The models in `opencode.jsonc.example` that can be served by the weak tier (`auto`,
-`auto-esc`, `weak-only`) deliberately do **not** declare image `modalities`, so opencode
-refuses image attachments locally instead of sending them to a model that would 400. That is
-the correct setting for this design: images travel as file paths to the tools, not as
-attachments to the brain. `strong-only` / `k3-only` do declare them, so pin one of those if
-you want to show a picture to the model directly.
+The models in `opencode.jsonc.example` that cannot read images (`auto`, `auto-esc`,
+`weak-only`, and `strong-only` — the strong tier, deepseek-v4-pro-0813, rejects image
+input too) deliberately do **not** declare image `modalities`, so opencode refuses image
+attachments locally instead of sending them to a model that would 400. That is the correct
+setting for this design: images travel as file paths to the tools, not as attachments to
+the brain. `k3-only` (Kimi K3) is the one route that declares them, so pin it if you want
+to show a picture to the model directly.
 
 ## Limits
 

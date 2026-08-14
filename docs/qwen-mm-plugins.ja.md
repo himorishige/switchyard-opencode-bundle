@@ -111,10 +111,11 @@ docker compose restart
 
 ### 添付について
 
-`opencode.jsonc.example` のうち weak tier が応答しうるモデル（`auto` / `auto-esc` / `weak-only`）には、
+`opencode.jsonc.example` のうち画像を読めないモデル（`auto` / `auto-esc` / `weak-only`、そして
+strong tier の deepseek-v4-pro-0813 も画像入力を拒否するため `strong-only` も）には、
 画像の `modalities` を**意図的に宣言していない**。宣言がなければ opencode が手元で添付を断るので、
 400 になるモデルにリクエストが飛ばない。この構成ではそれが正しい設定になる —— 画像はファイルパスとして
-ツールに渡り、脳への添付にはならないからだ。`strong-only` / `k3-only` には宣言があるので、モデルに
+ツールに渡り、脳への添付にはならないからだ。宣言があるのは `k3-only`（Kimi K3）だけなので、モデルに
 画像を直接見せたいときはそちらを指定する。
 
 ## 制約

@@ -51,6 +51,13 @@ llm_client = "fireworks_judge"
 extra_body = { reasoning_effort = "none", temperature = 0 }
 
 [targets.strong]
+id = "accounts/fireworks/models/deepseek-v4-pro-0813"
+llm_client = "fireworks"
+
+# Kimi K3 stays as its own target for the k3-only route: sparring/planning seat
+# (opencode pins the plan agent here) and the vision-capable manual image lane.
+# Reusing the plain `fireworks` client is safe: no other target shares this id.
+[targets.k3]
 id = "accounts/fireworks/models/kimi-k3"
 llm_client = "fireworks"
 
@@ -112,12 +119,15 @@ id = "weak-only"
 type = "passthrough"
 target = "weak"
 
-# Deprecated alias of strong-only. Kept because opencode raises UnknownError for
-# model ids that disappear from provider config; remove only after team configs drop it.
+# Kimi K3, pinned. Formerly an alias of strong-only; since the strong tier moved
+# to deepseek-v4-pro-0813 (2026-08-14) this is the dedicated K3 seat: the plan
+# agent's sparring partner and the manual lane for image attachments (K3 reads
+# images; the strong tier does not). The route id predates the split and stays -
+# opencode raises UnknownError for model ids that disappear from provider config.
 [routes.k3-only]
 id = "k3-only"
 type = "passthrough"
-target = "strong"
+target = "k3"
 
 # --- An eye for the text-only weak tier (Qwen-MM-Plugins) ---
 # The weak tier rejects image input; instead of moving the tier to a costlier vision
