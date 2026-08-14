@@ -18,6 +18,7 @@ Cost model
   Same as the measured Fireworks serverless rates used throughout this
   project (USD per 1M tokens, input / cached input / output):
     deepseek-v4-pro          1.74 / 0.145 / 3.48
+    deepseek-v4-pro-0813     1.32 / 0.044 / 3.96
     deepseek-v4-flash(-0731) 0.14 / 0.028 / 0.28
     kimi-k3                  3.00 / 0.30  / 15.00
     minimax-m3               0.30 / 0.059 / 1.20
@@ -26,7 +27,8 @@ Cost model
   under-count cannot hide in the totals.
 
 The "strong-pinned" counterfactual
-  What the same token volume would cost billed at kimi-k3 rates, with
+  What the same token volume would cost billed at the current strong tier's
+  rates (deepseek-v4-pro-0813 since 2026-08-14; kimi-k3 before that), with
   classifier rows excluded (a pinned setup makes no routing calls). It is an
   approximation — a strong model would not generate the exact same tokens —
   but it is the same yardstick the project's published numbers use.
@@ -47,13 +49,14 @@ from pathlib import Path
 # (input, cached_input, output) USD per 1M tokens
 PRICES = {
     "accounts/fireworks/models/deepseek-v4-pro": (1.74, 0.145, 3.48),
+    "accounts/fireworks/models/deepseek-v4-pro-0813": (1.32, 0.044, 3.96),
     "accounts/fireworks/models/deepseek-v4-flash": (0.14, 0.028, 0.28),
     "accounts/fireworks/models/deepseek-v4-flash-0731": (0.14, 0.028, 0.28),
     "accounts/fireworks/models/kimi-k3": (3.00, 0.30, 15.00),
     "accounts/fireworks/models/minimax-m3": (0.30, 0.059, 1.20),
     "accounts/fireworks/models/qwen3p7-plus": (0.40, 0.08, 1.60),
 }
-STRONG_PRICE = PRICES["accounts/fireworks/models/kimi-k3"]
+STRONG_PRICE = PRICES["accounts/fireworks/models/deepseek-v4-pro-0813"]
 
 SNAPSHOT_RE = re.compile(r"routing-(?P<user>.+)-\d{8}-\d{6}\.jsonl$")
 
@@ -241,7 +244,7 @@ def main():
             f"   saved: {saved:.1%}"
         )
         print(
-            "(same token volume at kimi-k3 rates, classifier calls excluded; approximation)"
+            "(same token volume at deepseek-v4-pro-0813 rates, classifier calls excluded; approximation)"
         )
 
     for model, info in report["unknown_models"].items():

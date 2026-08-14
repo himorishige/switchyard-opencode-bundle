@@ -48,25 +48,25 @@
         // per session after a clear pattern of trouble). Buffered streaming
         // until the latch — see README "Evidence-based escalation".
         "auto-esc": { "name": "auto-esc — weak-first, escalates on trouble" },
-        // `modalities` is what makes opencode send an image at all: without it
-        // an attachment is dropped and the model answers "I cannot read
-        // images", however capable the upstream model is. Kimi K3 reads
-        // images, so both routes that pin it declare the input modality.
+        // Deliberately NO modalities here: deepseek-v4-pro-0813 rejects image
+        // input. Declaring it would let opencode send a screenshot upstream,
+        // which fails with a 400. Attach images on k3-only instead.
         "strong-only": {
-          "name": "strong-only — kimi-k3 pinned",
-          "modalities": { "input": ["text", "image"], "output": ["text"] }
+          "name": "strong-only — deepseek-v4-pro-0813 pinned"
         },
-        // Deliberately NO modalities on auto / auto-esc / weak-only: the weak
-        // tier (deepseek-v4-flash-0731) rejects image input outright. Declaring
-        // it there would let opencode send a screenshot into a session already
-        // pinned to weak, which fails with an upstream 400. Attach images on
-        // strong-only / k3-only instead.
+        // Deliberately NO modalities on auto / auto-esc / weak-only either: the
+        // weak tier (deepseek-v4-flash-0731) rejects image input outright.
+        // Declaring it there would let opencode send a screenshot into a
+        // session already pinned to weak, which fails with an upstream 400.
         "weak-only": { "name": "weak-only — deepseek-v4-flash-0731 pinned" },
-        // Since strong moved to K3 on 2026-08-07 this points at the same
-        // target as strong-only. Kept as an alias so existing configs that
-        // reference it keep working.
+        // Kimi K3, pinned — its own target since strong moved to
+        // deepseek-v4-pro-0813 (2026-08-14). The plan agent points here, and
+        // this is the manual lane for image attachments: `modalities` is what
+        // makes opencode send an image at all — without it an attachment is
+        // dropped and the model answers "I cannot read images", however capable
+        // the upstream model is. Kimi K3 reads images.
         "k3-only": {
-          "name": "k3-only — kimi-k3 pinned (alias of strong-only)",
+          "name": "k3-only — kimi-k3 pinned (plan/vision)",
           "modalities": { "input": ["text", "image"], "output": ["text"] }
         }
       }
@@ -79,16 +79,18 @@
   // (through auto they occasionally turn into strong calls)
   "small_model": "switchyard/weak-only",
 
-  // Per-agent pinning, enabled by default now that strong is K3 ($15/1M output).
-  // - plan: wired straight to strong (Kimi K3). The classifier's capability
-  //   rubric is written around coding work, so deep non-code discussions fall
-  //   to a probabilistic threshold (most reach strong, not all). Design
-  //   conversations should be deterministic, not a bet on the classifier
+  // Per-agent pinning, enabled by default.
+  // - plan: wired straight to Kimi K3 (k3-only) for sparring/planning quality.
+  //   The classifier's capability rubric is written around coding work, so deep
+  //   non-code discussions fall to a probabilistic threshold (most reach
+  //   strong, not all). Design conversations should be deterministic, not a
+  //   bet on the classifier — and they stay on K3 even though the strong tier
+  //   moved to deepseek-v4-pro-0813
   // - explore / scout: subagents inherit the model of whatever called them, so
   //   pinning weak explicitly cuts the inheritance. Without it, work as simple
-  //   as reading grep output is billed at K3's output rate
+  //   as reading grep output is billed at K3's output rate ($15/1M)
   "agent": {
-    "plan": { "model": "switchyard/strong-only" },
+    "plan": { "model": "switchyard/k3-only" },
     "explore": { "model": "switchyard/weak-only" },
     "scout": { "model": "switchyard/weak-only" }
   }

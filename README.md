@@ -13,13 +13,13 @@ opencode → Switchyard (127.0.0.1:4100) → Fireworks AI
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
 | `auto` (default)               | Automatic routing tuned for coding agents. This is all you need day to day                                                |
 | `auto-esc` (opt-in)            | Weak-first; a trajectory judge escalates to strong on real trouble. [Details](#evidence-based-escalation-auto-esc-opt-in) |
-| `strong-only`                  | Pinned to kimi-k3 (useful when you suspect routing is the problem)                                                        |
+| `strong-only`                  | Pinned to deepseek-v4-pro-0813 (useful when you suspect routing is the problem)                                           |
 | `weak-only`                    | Pinned to deepseek-v4-flash-0731                                                                                          |
-| `k3-only`                      | Alias of `strong-only` (the old opt-in route from before K3 became strong). [Why](#the-strong-tier-and-kimi-k3)           |
+| `k3-only`                      | Pinned to Kimi K3 — the plan agent's seat and the image-attachment lane. [Why](#the-strong-tier-and-kimi-k3)              |
 
 Everything is configured in a single file, `routes.toml` (the config format of Switchyard's native Rust server).
 
-**Attaching images**: use `strong-only` or `k3-only`. Both pin Kimi K3, which reads images, and both declare `modalities` in the opencode config so the attachment is actually sent — opencode silently drops an image for any model that does not declare it, and the model then replies that it cannot read images. `auto`, `auto-esc` and `weak-only` intentionally leave the declaration out, because the weak tier (deepseek-v4-flash-0731) rejects image input: on `auto`, session affinity can hand a screenshot to a session already pinned to weak, which fails with an upstream 400.
+**Attaching images**: use `k3-only`. It pins Kimi K3, which reads images, and it is the only route that declares `modalities` in the opencode config so the attachment is actually sent — opencode silently drops an image for any model that does not declare it, and the model then replies that it cannot read images. The strong tier (deepseek-v4-pro-0813) does not accept image input, so `strong-only` leaves the declaration out too; `auto`, `auto-esc` and `weak-only` do the same because the weak tier (deepseek-v4-flash-0731) rejects image input: on `auto`, session affinity can hand a screenshot to a session already pinned to weak, which fails with an upstream 400.
 
 > Setting this up for the first time? Start from [docs/onboarding.md](docs/onboarding.md), a single linear path through the whole setup.
 
@@ -121,13 +121,10 @@ If you have your own settings — a theme, other providers — do not overwrite.
     "models": {
       "auto": { "name": "auto — Switchyard routing" },
       "auto-esc": { "name": "auto-esc — weak-first, escalates on trouble" },
-      "strong-only": {
-        "name": "strong-only — kimi-k3 pinned",
-        "modalities": { "input": ["text", "image"], "output": ["text"] }
-      },
+      "strong-only": { "name": "strong-only — deepseek-v4-pro-0813 pinned" },
       "weak-only": { "name": "weak-only — deepseek-v4-flash-0731 pinned" },
       "k3-only": {
-        "name": "k3-only — kimi-k3 pinned (alias of strong-only)",
+        "name": "k3-only — kimi-k3 pinned (plan/vision)",
         "modalities": { "input": ["text", "image"], "output": ["text"] }
       }
     }
@@ -136,7 +133,7 @@ If you have your own settings — a theme, other providers — do not overwrite.
 "model": "switchyard/auto",
 "small_model": "switchyard/weak-only",
 "agent": {
-  "plan": { "model": "switchyard/strong-only" },
+  "plan": { "model": "switchyard/k3-only" },
   "explore": { "model": "switchyard/weak-only" },
   "scout": { "model": "switchyard/weak-only" }
 }
@@ -147,7 +144,7 @@ A few things to watch out for when merging:
 - If you already have a `provider` key, add only the `switchyard` entry **inside** it. Pasting the whole `provider` block over yours will wipe your existing providers
 - The strict-privacy keys (`share`, `autoupdate`, `tools`, `permission`, …) do not conflict with any of this. They coexist as-is
 - If you already set `model` / `small_model` and want to keep your current default, skip those two lines and pick the route from the model picker when you need it
-- For the reasoning behind the `agent` block (plan wired straight to strong, explore / scout pinned to weak), see [Agent-level pinning](#agent-level-pinning-plan-mode-enabled-by-default)
+- For the reasoning behind the `agent` block (plan wired straight to Kimi K3 via `k3-only`, explore / scout pinned to weak), see [Agent-level pinning](#agent-level-pinning-plan-mode-enabled-by-default)
 - Restart opencode after merging, and confirm that the model picker lists `Switchyard (Fireworks auto-routing)` with its five routes (`auto`, `auto-esc`, `strong-only`, `weak-only`, `k3-only`)
 
 ### Day-to-day notes
@@ -159,11 +156,11 @@ A few things to watch out for when merging:
 
 ### The strong tier and Kimi K3
 
-On 2026-08-07 the strong tier of automatic routing moved from deepseek-v4-pro to **Kimi K3**, prioritizing response quality on deep design discussions and planning. `k3-only` is a leftover from when K3 was an opt-in route you selected manually; today it is an **alias** pointing at the same target as `strong-only`, kept so existing configs do not break.
+The strong tier has moved twice. On 2026-08-07 it went from deepseek-v4-pro to **Kimi K3**, prioritizing response quality on deep design discussions and planning. On 2026-08-14 it moved again, to **deepseek-v4-pro-0813** — the dated successor of the original pro tier — after a four-axis measurement pass confirmed it qualifies: tool calling works streamed and non-streamed with reasoning cleanly separated into `reasoning_content`, zero language drift on 15 Japanese consultations, blind sparring answers rated sufficient 12/13 by a third-party judge (K3: 11/13), 11/14 cumulative on the discriminative LiveCodeBench set (K3 rerun: 10/14), and lower latency throughout.
 
-The cost side is a trade. Per 1M tokens, K3 is $3.00 / $0.30 / $15.00 (input / cached / output) against $1.74 / $0.145 / $3.48 for the previous strong tier, deepseek-v4-pro. Applying those prices to the measured token distribution of real agent loops puts **the absolute cost per run at roughly 3× the previous figure** (3.0× for both `auto` and pinned strong). The savings _rate_ of `auto` — how much the weak tier saves you — barely moves, because routing works on the price ladder itself. Do not read `auto` as "the expensive tier gets diluted"; read it as **both the floor and the ceiling rising together**.
+K3 did not leave. Deep design discussions are exactly where it earned its seat, so `k3-only` — formerly an alias of `strong-only` — is now its **own route pinned to Kimi K3**: the plan agent points there by default, and it is the manual lane for image attachments (K3 reads images; the strong tier does not).
 
-The dominant cost term shifts to output: about 68% of the total for K3 versus about 47% for deepseek-v4-pro. The more you have it write long design documents or large patches, the further above the estimate you land.
+The cost side moves the opposite way from the last switch. Per 1M tokens, deepseek-v4-pro-0813 is $1.32 / $0.044 / $3.96 (input / cached / output) against K3's $3.00 / $0.30 / $15.00. Replaying the measured token ledger of real usage prices the strong seat at **roughly a third to a quarter of the K3 figure** ($24.43 → $5.98–7.23 on the reference ledger). The savings _rate_ of `auto` barely moves, because routing works on the price ladder itself — this time read it as **both the floor and the ceiling coming down together**. Output remains the dominant cost term: about 62% of the total for pro-0813, versus about 68% for K3.
 
 #### Agent-level pinning (plan mode, enabled by default)
 
@@ -173,13 +170,13 @@ That is why `opencode.jsonc.example` enables per-agent pinning **by default** (t
 
 ```json
 "agent": {
-  "plan": { "model": "switchyard/strong-only" },
+  "plan": { "model": "switchyard/k3-only" },
   "explore": { "model": "switchyard/weak-only" },
   "scout": { "model": "switchyard/weak-only" }
 }
 ```
 
-`plan` is wired straight to strong (Kimi K3). Switching to plan mode bypasses the classifier and goes strong; switching back to build mode returns you to the default `auto` (`opencode run --agent plan` takes the same path). Pinning `explore` / `scout` to weak is the defense in the other direction: **opencode subagents inherit the model of whatever called them**, so leaving them unset means a subagent that only reads grep output still bills at the $15/1M output rate.
+`plan` is wired straight to Kimi K3 (`k3-only`) — design conversations stay on K3 even though the strong tier moved to deepseek-v4-pro-0813. Switching to plan mode bypasses the classifier and goes to K3; switching back to build mode returns you to the default `auto` (`opencode run --agent plan` takes the same path). Pinning `explore` / `scout` to weak is the defense in the other direction: **opencode subagents inherit the model of whatever called them**, so leaving them unset means a subagent that only reads grep output still bills at K3's $15/1M output rate.
 
 #### Updating an existing router
 
@@ -196,21 +193,21 @@ Route names do not change, so editing `opencode.json` is not required. Update it
 "models": {
   "auto": { "name": "auto — Switchyard routing" },
   "auto-esc": { "name": "auto-esc — weak-first, escalates on trouble" },
-  "strong-only": { "name": "strong-only — kimi-k3 pinned" },
+  "strong-only": { "name": "strong-only — deepseek-v4-pro-0813 pinned" },
   "weak-only": { "name": "weak-only — deepseek-v4-flash-0731 pinned" },
-  "k3-only": { "name": "k3-only — kimi-k3 pinned (alias of strong-only)" }
+  "k3-only": { "name": "k3-only — kimi-k3 pinned (plan/vision)" }
 }
 ```
 
 Restart opencode after saving; config is read only at startup, so a long-running session will not pick it up. Note that opencode only knows the models listed here — deleting `k3-only` from `models` makes anything referencing it (an old plan pin, for instance) fail with `UnknownError`. Clean up the references first.
 
-#### Reverting to the previous strong tier (deepseek-v4-pro)
+#### Reverting to the previous strong tier (kimi-k3)
 
-If the new tier does not suit you, the strong target is defined once in `routes.toml`, so it is a one-line change followed by a restart. Both `auto` and `strong-only` (plus the `k3-only` alias) follow it.
+If the new tier does not suit you, the strong target is defined once in `routes.toml`, so it is a one-line change followed by a restart. `auto`, `auto-esc` and `strong-only` all follow it (`k3-only` has its own target and is unaffected).
 
 ```toml
 [targets.strong]
-id = "accounts/fireworks/models/deepseek-v4-pro"
+id = "accounts/fireworks/models/kimi-k3"
 ```
 
 ### Evidence-based escalation (auto-esc, opt-in)
@@ -317,7 +314,7 @@ For releases that **add** a route, also register the new route name under `provi
 
 ### Changing models
 
-Each tier is a `[targets.<name>]` table in `routes.toml`, referenced by the routes. To switch strong from kimi-k3 to GLM-5.2, for example, edit one line:
+Each tier is a `[targets.<name>]` table in `routes.toml`, referenced by the routes. To switch strong from deepseek-v4-pro-0813 to GLM-5.2, for example, edit one line:
 
 ```toml
 [targets.strong]
@@ -367,7 +364,7 @@ To look at the raw surfaces yourself:
 
 One improvement over the previous setup: the classifier's own calls now appear in the JSONL with `tier="classifier"`, so the routing overhead cost — invisible before — shows up in the weekly summary as its own row.
 
-**The source of truth for usage and cost** is per-model usage on the [Fireworks dashboard](https://app.fireworks.ai/). Since strong (kimi-k3) and weak (deepseek-v4-flash-0731) are different models, **per-model usage is exactly your tier distribution multiplied by cost** — that is what a savings report is built from. Media calls to the eye ([qwen3p7-plus](docs/qwen-mm-plugins.md)) get their own model row on the dashboard and their own `pinned:qwen3p7-plus` row in the local summaries, so they never blur the tier split. The stats above are for analyzing the routing breakdown.
+**The source of truth for usage and cost** is per-model usage on the [Fireworks dashboard](https://app.fireworks.ai/). Since strong (deepseek-v4-pro-0813) and weak (deepseek-v4-flash-0731) are different models, **per-model usage is exactly your tier distribution multiplied by cost** — that is what a savings report is built from. Kimi K3 (`k3-only` — plan mode and image attachments) and media calls to the eye ([qwen3p7-plus](docs/qwen-mm-plugins.md)) each get their own model row on the dashboard and their own `pinned:kimi-k3` / `pinned:qwen3p7-plus` rows in the local summaries, so they never blur the tier split. The stats above are for analyzing the routing breakdown.
 
 ## Experimental
 

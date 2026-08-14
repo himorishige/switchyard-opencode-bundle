@@ -13,13 +13,13 @@ opencode → Switchyard (127.0.0.1:4100) → Fireworks AI
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `auto`（既定）               | coding-agent 向け自動ルーティング。普段はこれだけで OK                                                                    |
 | `auto-esc`（オプトイン）     | weak 先行。軌跡 judge が本物のトラブルを検知したら strong へ昇格。[詳細](#証拠ベースのエスカレーションauto-escオプトイン) |
-| `strong-only`                | kimi-k3 固定（ルーティングを疑ったときの切り分け用）                                                                      |
+| `strong-only`                | deepseek-v4-pro-0813 固定（ルーティングを疑ったときの切り分け用）                                                         |
 | `weak-only`                  | deepseek-v4-flash-0731 固定                                                                                               |
-| `k3-only`                    | `strong-only` の別名（strong=K3 切替以前のオプトインルート。[経緯](#strong-tier-と-kimi-k3)）                             |
+| `k3-only`                    | Kimi K3 固定——plan agent の指し先 + 画像添付レーン（[経緯](#strong-tier-と-kimi-k3)）                                     |
 
 設定は `routes.toml`（Switchyard ネイティブ Rust サーバーの設定形式）1 枚です。
 
-**画像を添付するとき**は `strong-only` または `k3-only` を使ってください。どちらも画像を読める Kimi K3 を固定しており、opencode 設定側で `modalities` を宣言しているので添付が実際に送信されます。宣言のないモデルでは opencode が画像を黙って落とし、モデルが「画像を読めません」と答えます。`auto` / `auto-esc` / `weak-only` はあえて宣言していません。weak tier（deepseek-v4-flash-0731）が画像入力を拒否するためで、`auto` ではセッションアフィニティによって weak に固定済みのセッションへスクリーンショットが渡り、上流から 400 が返ります。
+**画像を添付するとき**は `k3-only` を使ってください。画像を読める Kimi K3 を固定した唯一のルートで、opencode 設定側で `modalities` を宣言しているので添付が実際に送信されます。宣言のないモデルでは opencode が画像を黙って落とし、モデルが「画像を読めません」と答えます。strong tier（deepseek-v4-pro-0813）は画像入力に非対応のため `strong-only` にも宣言はありません。`auto` / `auto-esc` / `weak-only` もあえて宣言していません。weak tier（deepseek-v4-flash-0731）が画像入力を拒否するためで、`auto` ではセッションアフィニティによって weak に固定済みのセッションへスクリーンショットが渡り、上流から 400 が返ります。
 
 > 初めてセットアップする場合は、[docs/onboarding.ja.md](docs/onboarding.ja.md)（初回セットアップの一本道手順）から始めるのがおすすめです。
 
@@ -121,13 +121,10 @@ theme や他プロバイダなど独自の設定を足している場合は、�
     "models": {
       "auto": { "name": "auto — Switchyard routing" },
       "auto-esc": { "name": "auto-esc — weak-first, escalates on trouble" },
-      "strong-only": {
-        "name": "strong-only — kimi-k3 pinned",
-        "modalities": { "input": ["text", "image"], "output": ["text"] }
-      },
+      "strong-only": { "name": "strong-only — deepseek-v4-pro-0813 pinned" },
       "weak-only": { "name": "weak-only — deepseek-v4-flash-0731 pinned" },
       "k3-only": {
-        "name": "k3-only — kimi-k3 pinned (alias of strong-only)",
+        "name": "k3-only — kimi-k3 pinned (plan/vision)",
         "modalities": { "input": ["text", "image"], "output": ["text"] }
       }
     }
@@ -136,7 +133,7 @@ theme や他プロバイダなど独自の設定を足している場合は、�
 "model": "switchyard/auto",
 "small_model": "switchyard/weak-only",
 "agent": {
-  "plan": { "model": "switchyard/strong-only" },
+  "plan": { "model": "switchyard/k3-only" },
   "explore": { "model": "switchyard/weak-only" },
   "scout": { "model": "switchyard/weak-only" }
 }
@@ -147,7 +144,7 @@ theme や他プロバイダなど独自の設定を足している場合は、�
 - 既に `provider` キーがある場合は、その**中に** `switchyard` エントリだけを追加してください。`provider` ブロックごと貼り付けて置き換えると、既存のプロバイダ設定が消えます
 - strict-privacy 系のキー（`share` / `autoupdate` / `tools` / `permission` 等）とは衝突しません。そのまま共存できます
 - `model` / `small_model` を既に設定していて、いまの既定モデルを残したい場合は、この 2 行を取り込まず、使うときだけモデルピッカーから選択してください
-- `agent` ブロックの意図（plan の strong 直結、explore / scout の weak 固定）は「[classifier に任せない領域](#classifier-に任せない領域plan-モードの固定既定有効)」を参照してください
+- `agent` ブロックの意図（plan の K3（`k3-only`）直結、explore / scout の weak 固定）は「[classifier に任せない領域](#classifier-に任せない領域plan-モードの固定既定有効)」を参照してください
 - マージ後に opencode を再起動し、モデルピッカーに `Switchyard (Fireworks auto-routing)` のモデル群（`auto` / `auto-esc` / `strong-only` / `weak-only` / `k3-only`）が出ることを確認してください
 
 ### 運用のポイント
@@ -159,11 +156,11 @@ theme や他プロバイダなど独自の設定を足している場合は、�
 
 ### strong tier と Kimi K3
 
-2026-08-07 に、自動ルーティングの strong tier を deepseek-v4-pro から **Kimi K3** に切り替えました。深い設計相談・プランニングでの応答品質を優先した変更です。`k3-only` はそれ以前に K3 を手動で使うためのオプトインルートだった名残で、現在は `strong-only` と同じ接続先を指す**別名**です（旧設定の参照を壊さないために残しています）。
+strong tier は 2 度動いています。2026-08-07 に deepseek-v4-pro から **Kimi K3** へ（深い設計相談・プランニングでの応答品質を優先）、そして 2026-08-14 に **deepseek-v4-pro-0813**——旧 pro tier の日付版後継——へ切り替えました。後者は 4 軸の実測で適格性を確認した上での切替です: tool calling が非ストリーム・ストリームとも動作し思考は `reasoning_content` に分離、日本語の相談 15 問で言語逸脱ゼロ、壁打ち盲検の第三者 judge 評価で sufficient 12/13（K3 は 11/13）、弁別力のある LiveCodeBench 14 問で累計 11/14（K3 の再走は 10/14）、レイテンシも一貫して短い、という結果でした。
 
-コスト面はトレードです。100 万トークンあたり K3 は $3.00 / $0.30 / $15.00（input / cached / output）、旧 strong の deepseek-v4-pro は $1.74 / $0.145 / $3.48。エージェントループの実測トークン分布に単価を当てた試算では **1 run あたりの絶対額が約 3 倍**になります（strong 固定・auto ともに 3.0 倍）。一方で `auto` の削減率（weak 併用による節約幅）はほぼ変わりません。ルーティングは単価の梯子に働くためです。「auto にすれば高単価が薄まる」のではなく、**下限も上限も一緒に持ち上がる**と考えてください。
+K3 がいなくなったわけではありません。深い設計相談は K3 が椅子を勝ち取った領域そのものなので、`k3-only` は `strong-only` の別名をやめて **Kimi K3 固定の独立ルート**になりました。plan agent は既定でここを指し、画像添付の手動レーンでもあります（K3 は画像を読めますが、strong tier は読めません）。
 
-コストの支配項は output に移ります（K3 は総額の約 68% が output、deepseek-v4-pro は約 47%）。長文の設計文書や大きなパッチを吐かせる使い方をするほど、試算より上振れします。
+コスト面は前回の切替と逆向きに動きます。100 万トークンあたり deepseek-v4-pro-0813 は $1.32 / $0.044 / $3.96（input / cached / output）、K3 は $3.00 / $0.30 / $15.00。実運用の実測トークン台帳に単価を当て直すと、strong 席の絶対額は **K3 時代の約 1/3〜1/4** になります（参照台帳で $24.43 → $5.98〜7.23）。一方で `auto` の削減率はほぼ変わりません。ルーティングは単価の梯子に働くためです。今回は**下限も上限も一緒に下がる**と考えてください。コストの支配項は引き続き output です（pro-0813 は総額の約 62%、K3 は約 68%）。
 
 #### classifier に任せない領域（plan モードの固定、既定有効）
 
@@ -173,13 +170,13 @@ classifier は「weak tier がタスクを完遂できる確率」を推定し�
 
 ```json
 "agent": {
-  "plan": { "model": "switchyard/strong-only" },
+  "plan": { "model": "switchyard/k3-only" },
   "explore": { "model": "switchyard/weak-only" },
   "scout": { "model": "switchyard/weak-only" }
 }
 ```
 
-plan は strong（Kimi K3）直結です。plan モードに切り替えたときだけ classifier を通さず strong になり、build モードに戻せば既定の `auto` に戻ります（`opencode run --agent plan` でも同じ経路）。`explore` / `scout` の weak 明示は逆方向の防御で、**opencode のサブエージェントは呼び出し元のモデルを継承する**ため、指定を省くと grep 結果を読むだけのサブエージェントにも $15/1M の output 単価が乗ります。
+plan は Kimi K3（`k3-only`）直結です——strong tier が deepseek-v4-pro-0813 に移った後も、設計の議論は K3 のままです。plan モードに切り替えたときだけ classifier を通さず K3 になり、build モードに戻せば既定の `auto` に戻ります（`opencode run --agent plan` でも同じ経路）。`explore` / `scout` の weak 明示は逆方向の防御で、**opencode のサブエージェントは呼び出し元のモデルを継承する**ため、指定を省くと grep 結果を読むだけのサブエージェントにも K3 の $15/1M の output 単価が乗ります。
 
 #### すでにルーターを使っている場合の更新手順
 
@@ -196,21 +193,21 @@ route 名は変わらないため、`opencode.json` の変更は必須ではあ�
 "models": {
   "auto": { "name": "auto — Switchyard routing" },
   "auto-esc": { "name": "auto-esc — weak-first, escalates on trouble" },
-  "strong-only": { "name": "strong-only — kimi-k3 pinned" },
+  "strong-only": { "name": "strong-only — deepseek-v4-pro-0813 pinned" },
   "weak-only": { "name": "weak-only — deepseek-v4-flash-0731 pinned" },
-  "k3-only": { "name": "k3-only — kimi-k3 pinned (alias of strong-only)" }
+  "k3-only": { "name": "k3-only — kimi-k3 pinned (plan/vision)" }
 }
 ```
 
 保存したら opencode を再起動します。設定は起動時にしか読み込まれないため、起動しっぱなしのセッションには反映されません。なお opencode はここに書かれたモデルしか認識しないため、`models` から `k3-only` を消すと、それを参照する設定（旧 plan 固定など）が `UnknownError` になります。消す場合は参照側を先に整理してください。
 
-#### 切替前の挙動（strong = deepseek-v4-pro）に戻すには
+#### 切替前の挙動（strong = kimi-k3）に戻すには
 
-体感が合わない場合は、`routes.toml` の 1 行を戻して restart してください。strong target の定義は 1 箇所だけで、`auto` と `strong-only`（および別名 `k3-only`）がそこを参照しています。
+体感が合わない場合は、`routes.toml` の 1 行を戻して restart してください。strong target の定義は 1 箇所だけで、`auto` / `auto-esc` / `strong-only` がそこを参照しています（`k3-only` は独立 target のため影響を受けません）。
 
 ```toml
 [targets.strong]
-id = "accounts/fireworks/models/deepseek-v4-pro"
+id = "accounts/fireworks/models/kimi-k3"
 ```
 
 ### 証拠ベースのエスカレーション（auto-esc、オプトイン）
@@ -311,7 +308,7 @@ route が**追加**されたリリースでは、それに加えて Global 設�
 
 ### モデルを変更するには
 
-tier の実体は `routes.toml` の `[targets.<name>]` テーブルで、各 route はそこを参照しています。例として strong を kimi-k3 から GLM-5.2 に切り替える場合、書き換えるのは 1 行です。
+tier の実体は `routes.toml` の `[targets.<name>]` テーブルで、各 route はそこを参照しています。例として strong を deepseek-v4-pro-0813 から GLM-5.2 に切り替える場合、書き換えるのは 1 行です。
 
 ```toml
 [targets.strong]
@@ -361,7 +358,7 @@ curl -s http://127.0.0.1:4100/health
 
 旧構成からの改善が 1 点: classifier 自身のコールが JSONL に `tier="classifier"` で記録されるようになり、これまで不可視だったルーティング判定のコストが週次サマリーに独立行で出ます。
 
-**使用量・コストの正**: [Fireworks ダッシュボード](https://app.fireworks.ai/)のモデル別使用量を見てください。strong（kimi-k3）と weak（deepseek-v4-flash-0731）は別モデルなので、**モデル別使用量がそのまま tier 分布 × コスト**です。これが削減効果レポートの材料になります。目（[qwen3p7-plus](docs/qwen-mm-plugins.ja.md)）のメディア呼び出しも、ダッシュボードでは独立したモデル行、ローカル集計では `pinned:qwen3p7-plus` の独立行になるため、tier 分布と混ざりません。上の stats はルーティング内訳の分析用です。
+**使用量・コストの正**: [Fireworks ダッシュボード](https://app.fireworks.ai/)のモデル別使用量を見てください。strong（deepseek-v4-pro-0813）と weak（deepseek-v4-flash-0731）は別モデルなので、**モデル別使用量がそのまま tier 分布 × コスト**です。これが削減効果レポートの材料になります。Kimi K3（`k3-only`——plan モードと画像添付の分）と目（[qwen3p7-plus](docs/qwen-mm-plugins.ja.md)）のメディア呼び出しも、ダッシュボードでは独立したモデル行、ローカル集計では `pinned:kimi-k3` / `pinned:qwen3p7-plus` の独立行になるため、tier 分布と混ざりません。上の stats はルーティング内訳の分析用です。
 
 ## 実験用
 
