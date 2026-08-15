@@ -77,15 +77,35 @@ pi install npm:@gotgenes/pi-permission-system   # allow/ask/deny rules if you wa
 ```
 
 For MCP, Pi reads the standard `.mcp.json` files you may already have. To reach the team RAG
-service, add to `~/.pi/agent/mcp.json`:
+service and the Qwen-MM-Plugins vision tools (same pinned revision and router-backed
+configuration as the opencode setup — see `docs/qwen-mm-plugins.md`), add to
+`~/.pi/agent/mcp.json`:
 
 ```json
 {
   "mcpServers": {
-    "nvidia-rag": { "url": "http://<rag-service-host>:8091/mcp" }
+    "nvidia-rag": { "url": "http://<rag-service-host>:8091/mcp" },
+    "qwen-mm-plugins": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "qwen-mm-plugins[api] @ git+https://github.com/QwenLM/Qwen-MM-Plugins.git@8d6ea5a1f658260743307c52c2024ec87599fa48",
+        "qwen-mm-plugins-api"
+      ],
+      "env": {
+        "DASHSCOPE_BASE_URL": "http://127.0.0.1:4100/v1",
+        "DASHSCOPE_API_KEY": "EMPTY",
+        "QWEN_MM_CHAT_TIMEOUT": "900"
+      }
+    }
   }
 }
 ```
+
+Servers connect lazily, and the first `qwen-mm-plugins` start (a `uvx` stdio process) can exceed
+the connect window. If a call reports "configured but not connected", ask the agent to run
+`mcp({ "connect": "qwen-mm-plugins" })` once, or use `/mcp reconnect qwen-mm-plugins` in the TUI;
+subsequent calls use the cached tool metadata.
 
 If you install `pi-permission-system`, note that it applies to **all** projects once installed:
 create `~/.pi/agent/extensions/pi-permission-system/config.json` with a permissive default
@@ -106,3 +126,4 @@ numbers meaningful.
 - [ ] `pi -p "1+1?"` works headless
 - [ ] `/skill:` autocomplete lists `rag-kb` and `web-search`
 - [ ] (optional) `mcp` tool reaches `nvidia-rag` after installing pi-mcp-adapter
+- [ ] (optional) `mcp({ "connect": "qwen-mm-plugins" })` connects and `vision_chat` answers about a local image

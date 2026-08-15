@@ -61,15 +61,30 @@ pi install npm:pi-subagents            # scout / reviewer / worker への委譲
 pi install npm:@gotgenes/pi-permission-system   # allow/ask/deny のガードレールが欲しい場合
 ```
 
-MCP は、既にあれば標準の `.mcp.json` をそのまま読みます。チームの RAG サービスに繋ぐ場合は `~/.pi/agent/mcp.json` に追記します。
+MCP は、既にあれば標準の `.mcp.json` をそのまま読みます。チームの RAG サービスと Qwen-MM-Plugins の vision ツール（opencode 設定と同じピン留めリビジョン・ルーター経由構成。`docs/qwen-mm-plugins.ja.md` 参照）に繋ぐ場合は `~/.pi/agent/mcp.json` に追記します。
 
 ```json
 {
   "mcpServers": {
-    "nvidia-rag": { "url": "http://<rag-service-host>:8091/mcp" }
+    "nvidia-rag": { "url": "http://<rag-service-host>:8091/mcp" },
+    "qwen-mm-plugins": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "qwen-mm-plugins[api] @ git+https://github.com/QwenLM/Qwen-MM-Plugins.git@8d6ea5a1f658260743307c52c2024ec87599fa48",
+        "qwen-mm-plugins-api"
+      ],
+      "env": {
+        "DASHSCOPE_BASE_URL": "http://127.0.0.1:4100/v1",
+        "DASHSCOPE_API_KEY": "EMPTY",
+        "QWEN_MM_CHAT_TIMEOUT": "900"
+      }
+    }
   }
 }
 ```
+
+サーバは遅延接続で、`qwen-mm-plugins` の初回起動（`uvx` の stdio プロセス）は接続待ち時間を超えることがあります。「configured but not connected」と出た場合は、エージェントに `mcp({ "connect": "qwen-mm-plugins" })` を 1 回実行させるか、TUI で `/mcp reconnect qwen-mm-plugins` を実行してください。2 回目以降はツールメタデータのキャッシュが効きます。
 
 `pi-permission-system` を入れる場合の注意: インストールすると**全プロジェクトに適用**されます。`~/.pi/agent/extensions/pi-permission-system/config.json` に許可ベースの既定（`"*": "allow"` + 必要な deny / ask ルール）を必ず作ってください。これが無いと headless 実行が全ツールで fail-closed になります。
 
@@ -84,3 +99,4 @@ TUI の `/login` から ChatGPT Plus/Pro（Codex）・Claude・Copilot のサブ
 - [ ] `pi -p "1+1?"` が headless で動く
 - [ ] `/skill:` の補完に `rag-kb` と `web-search` が出る
 - [ ] （任意）pi-mcp-adapter 導入後、`mcp` ツールで `nvidia-rag` に到達できる
+- [ ] （任意）`mcp({ "connect": "qwen-mm-plugins" })` で接続でき、`vision_chat` がローカル画像に答える
