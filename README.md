@@ -298,6 +298,17 @@ For non-interactive runs (`codex exec`), add one line to `[mcp_servers.nvidia-ra
 
 For opencode and Claude Code, `git pull` is enough: the config and the plugin directory both point at the bundle. Codex uses symlinks, which follow the pull just as well. When a release changes `mcp.json.example`, check whether your local `mcp.json` needs the same change.
 
+## Pi (optional second client)
+
+[Pi](https://pi.dev/) is a minimal coding-agent harness that connects to the same router with a
+single JSON file, and reuses the team skills (`rag-kb` / `web-search`) as-is because they are
+standard Agent Skills. Compared to opencode it adds working headless image input
+(`pi -p @img "..."`), a machine-readable `--mode json` event stream, and subscription auth
+(`/login` for ChatGPT Plus/Pro (Codex), Claude, Copilot). opencode remains the primary client.
+
+Setup: copy `pi-models.json.example` and `pi-settings.json.example`, then follow
+[docs/pi-onboarding.md](docs/pi-onboarding.md) (15–20 minutes).
+
 ## Operations
 
 | Task                    | Command                                                                                                               |

@@ -1,0 +1,7 @@
+{
+  "defaultProvider": "switchyard",
+  "defaultModel": "auto",
+  "skills": ["<bundle-repo>/plugin/team-ai-kb/skills"],
+  "enableInstallTelemetry": false,
+  "enableAnalytics": false
+}

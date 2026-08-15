@@ -292,6 +292,12 @@ codex mcp add nvidia-rag --url "http://<rag-service-host>:8091/mcp"
 
 opencode と Claude Code は設定・プラグインディレクトリがバンドルを直接指しているため `git pull` だけで反映されます。Codex の symlink も同様に追随します。`mcp.json.example` が変わったリリースでは、手元の `mcp.json` への反映を確認してください。
 
+## Pi（任意の第 2 クライアント）
+
+[Pi](https://pi.dev/) は最小構成のコーディングエージェントハーネスです。JSON 1 枚で同じルーターに接続でき、チームスキル（`rag-kb` / `web-search`）は Agent Skills 標準のためそのまま共用できます。opencode と比べると、headless の画像入力（`pi -p @img "..."`）が動くこと、`--mode json` の機械可読イベントストリーム、サブスクリプション認証（`/login` で ChatGPT Plus/Pro（Codex）・Claude・Copilot）が加わります。主クライアントは引き続き opencode です。
+
+セットアップ: `pi-models.json.example` と `pi-settings.json.example` をコピーし、[docs/pi-onboarding.ja.md](docs/pi-onboarding.ja.md)（15〜20 分）に従ってください。
+
 ## 運用
 
 | 操作                   | コマンド                                                                                                   |
