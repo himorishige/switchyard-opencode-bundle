@@ -87,13 +87,14 @@ EOF
 
 ## 5. Agent Plugin（team-ai-kb）
 
-README「[Agent Plugin（rag-kb / web-search）](../README.ja.md#agent-pluginrag-kb--web-search)」の
-「[初期設定（共通・初回のみ）](../README.ja.md#初期設定共通初回のみ)」を済ませてから、
+README「[Agent Plugin（rag-kb / web-search / using-bee）](../README.ja.md#agent-pluginrag-kb--web-search--using-bee)」の
+「[初期設定（RAG のみ）](../README.ja.md#初期設定rag-のみ)」を済ませてから、
 使っているクライアント（[opencode](../README.ja.md#opencode-で使う) /
 [Claude Code](../README.ja.md#claude-code-で使う) / [Codex CLI](../README.ja.md#codex-cli-で使う)）の
 節に進んでください。
 
 - 初期設定で `mcp.json.example → mcp.json` をコピーした後に書き換える接続先アドレスは、チームの案内を参照してください
+- Backlog / bee は共有 MCP ではなく各自のローカル CLI 認証で使います
 
 ## 6. web 検索キー
 
@@ -102,7 +103,11 @@ README「[Agent Plugin（rag-kb / web-search）](../README.ja.md#agent-pluginrag
 学習不使用の条件だけは飛ばさずに読んでください——Gemini は**課金有効の GCP プロジェクトで
 発行したキーが必須**（free tier は学習利用される）、OpenAI は API 既定で学習不使用です。
 
-## 7. 動作確認チェックリスト
+## 7. Backlog / bee（任意）
+
+Backlog をエージェントから扱う場合は [backlog-bee-onboarding.ja.md](./backlog-bee-onboarding.ja.md) に従ってください。`using-bee` skill はバンドル済みなので、既に `plugin/team-ai-kb/skills` を読んでいるクライアントでは `git pull` と再起動だけで追加されます。
+
+## 8. 動作確認チェックリスト
 
 | 確認       | コマンド                                       | 期待する結果                                                       |
 | ---------- | ---------------------------------------------- | ------------------------------------------------------------------ |
@@ -112,6 +117,7 @@ README「[Agent Plugin（rag-kb / web-search）](../README.ja.md#agent-pluginrag
 | AGENTS.md  | `ls ~/.config/opencode/AGENTS.md`              | ファイルが存在する                                                 |
 | 環境変数   | `env \| grep OPENCODE_`                        | 手順 3 の値が並ぶ                                                  |
 | web 検索   | web-search-onboarding.ja.md の動作確認         | 回答 + `Sources:` + 統計行                                         |
+| Backlog    | backlog-bee-onboarding.ja.md の動作確認        | `bee user me --json` と `using-bee` skill が動く                   |
 
 - 長時間アイドル後の初回コールはコールドスタートで数十秒かかることがあります（2 回目からは数秒）。
   疎通確認のコマンドには `--max-time` を付けると原因の切り分けが楽になります

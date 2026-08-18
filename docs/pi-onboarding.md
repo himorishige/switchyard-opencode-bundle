@@ -49,10 +49,10 @@ cp pi-settings.json.example ~/.pi/agent/settings.json
 ```
 
 Then open `~/.pi/agent/settings.json` and replace `<bundle-repo>` with the absolute path of your
-clone of this repository. This makes the team skills (`rag-kb`, `web-search`) available in Pi —
+clone of this repository. This makes the team skills (`rag-kb`, `web-search`, `using-bee`) available in Pi —
 they are standard Agent Skills, so the same files serve both opencode and Pi. The `web-search`
 skill uses the same `GEMINI_API_KEY` / `OPENAI_API_KEY` environment variables you already set up
-in the web-search onboarding.
+in the web-search onboarding. The `using-bee` skill uses your local `bee` CLI authentication.
 
 If you already have your own `settings.json`, merge the `skills` entry instead of overwriting.
 
@@ -66,7 +66,7 @@ pi -p @screenshot.png "what is in this image?"   # headless with an image (k3-on
 ```
 
 Inside the TUI: `/model` or `Ctrl+P` switches routes (`auto` for daily work, `strong-only` /
-`k3-only` for hard tasks), `/skill:web-search` and `/skill:rag-kb` invoke the team skills.
+`k3-only` for hard tasks), `/skill:web-search`, `/skill:rag-kb`, and `/skill:using-bee` invoke the team skills.
 
 ## 5. Optional packages
 
@@ -124,6 +124,6 @@ numbers meaningful.
 - [ ] `pi --list-models switchyard` shows 6 routes
 - [ ] TUI footer shows `(switchyard) auto` and answers a prompt
 - [ ] `pi -p "1+1?"` works headless
-- [ ] `/skill:` autocomplete lists `rag-kb` and `web-search`
+- [ ] `/skill:` autocomplete lists `rag-kb`, `web-search`, and `using-bee`
 - [ ] (optional) `mcp` tool reaches `nvidia-rag` after installing pi-mcp-adapter
 - [ ] (optional) `mcp({ "connect": "qwen-mm-plugins" })` connects and `vision_chat` answers about a local image

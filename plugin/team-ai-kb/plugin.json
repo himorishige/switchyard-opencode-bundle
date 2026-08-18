@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "team-ai-kb",
-  "version": "0.1.0",
-  "description": "Agent-facing layer of the team AI environment: knowledge base search (rag-kb + nvidia-rag MCP) and web search (web-search skill)",
+  "version": "0.2.0",
+  "description": "Agent-facing layer of the team AI environment: knowledge base search (rag-kb + nvidia-rag MCP), web search (web-search skill), and Backlog operations via bee CLI (using-bee skill)",
   "license": "Apache-2.0"
 }

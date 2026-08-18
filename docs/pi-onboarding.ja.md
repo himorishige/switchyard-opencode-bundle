@@ -38,7 +38,7 @@ cp pi-models.json.example ~/.pi/agent/models.json
 cp pi-settings.json.example ~/.pi/agent/settings.json
 ```
 
-`~/.pi/agent/settings.json` を開き、`<bundle-repo>` をこのリポジトリのクローンの絶対パスに置き換えます。これでチームスキル（`rag-kb` / `web-search`）が Pi でも使えるようになります。スキルは Agent Skills 標準のため、opencode と Pi で同じファイルを共用します。`web-search` スキルは web-search オンボーディングで設定済みの `GEMINI_API_KEY` / `OPENAI_API_KEY` 環境変数をそのまま使います。
+`~/.pi/agent/settings.json` を開き、`<bundle-repo>` をこのリポジトリのクローンの絶対パスに置き換えます。これでチームスキル（`rag-kb` / `web-search` / `using-bee`）が Pi でも使えるようになります。スキルは Agent Skills 標準のため、opencode と Pi で同じファイルを共用します。`web-search` スキルは web-search オンボーディングで設定済みの `GEMINI_API_KEY` / `OPENAI_API_KEY` 環境変数をそのまま使います。`using-bee` スキルはローカルの `bee` CLI 認証を使います。
 
 既に自分の `settings.json` がある場合は、上書きせず `skills` エントリだけマージしてください。
 
@@ -51,7 +51,7 @@ pi -p "このリポジトリを 2 文で説明して"            # headless
 pi -p @screenshot.png "この画像に何が写っている？"  # 画像つき headless（k3-only か qwen3.7-plus で）
 ```
 
-TUI 内では `/model` または `Ctrl+P` で route を切り替えます（日常は `auto`、難しいタスクは `strong-only` / `k3-only`）。`/skill:web-search` と `/skill:rag-kb` でチームスキルを直接呼べます。
+TUI 内では `/model` または `Ctrl+P` で route を切り替えます（日常は `auto`、難しいタスクは `strong-only` / `k3-only`）。`/skill:web-search`、`/skill:rag-kb`、`/skill:using-bee` でチームスキルを直接呼べます。
 
 ## 5. 追加パッケージ（任意）
 
@@ -97,6 +97,6 @@ TUI の `/login` から ChatGPT Plus/Pro（Codex）・Claude・Copilot のサブ
 - [ ] `pi --list-models switchyard` で 6 route が表示される
 - [ ] TUI フッターに `(switchyard) auto` が出てプロンプトに応答する
 - [ ] `pi -p "1+1?"` が headless で動く
-- [ ] `/skill:` の補完に `rag-kb` と `web-search` が出る
+- [ ] `/skill:` の補完に `rag-kb`、`web-search`、`using-bee` が出る
 - [ ] （任意）pi-mcp-adapter 導入後、`mcp` ツールで `nvidia-rag` に到達できる
 - [ ] （任意）`mcp({ "connect": "qwen-mm-plugins" })` で接続でき、`vision_chat` がローカル画像に答える
