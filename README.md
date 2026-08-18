@@ -300,6 +300,25 @@ For non-interactive runs (`codex exec`), add one line to `[mcp_servers.nvidia-ra
 
 For opencode and Claude Code, `git pull` is enough: the config and the plugin directory both point at the bundle. Codex uses symlinks, which follow the pull just as well; add a symlink for `using-bee` if your local setup predates this release. When a release changes `mcp.json.example`, check whether your local `mcp.json` needs the same change.
 
+## tirith-guard (optional, recommended for opencode)
+
+[`plugin/tirith-guard/`](plugin/tirith-guard/) is an opencode plugin that guards every `bash` tool
+call with [Tirith](https://tirith.sh) before it runs. While `--auto` mode and the static
+`permission.bash` deny rules handle deterministically-bad commands, Tirith covers what a static deny
+list cannot: homograph/homoglyph URLs (`gіthub.com` with a Cyrillic `і`), pipe-to-shell, ANSI
+injection, credential leaks, and data exfiltration — 200+ rules, fully offline, sub-millisecond. It
+is fail-open by default, so it never blocks when tirith is not installed.
+
+Setup (macOS):
+
+```sh
+brew install sheeki03/tap/tirith
+# then add to ~/.config/opencode/opencode.json:
+#   "plugin": ["file:///abs/path/to/switchyard-opencode-bundle/plugin/tirith-guard/index.ts"]
+```
+
+Full install, tuning (env vars), and a verification checklist: [`plugin/tirith-guard/README.md`](plugin/tirith-guard/README.md).
+
 ## Pi (optional second client)
 
 [Pi](https://pi.dev/) is a minimal coding-agent harness that connects to the same router with a
