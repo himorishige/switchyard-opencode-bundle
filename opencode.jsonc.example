@@ -28,8 +28,50 @@
   },
   "permission": {
     "websearch": "deny",
-    "webfetch": "ask"
+    "webfetch": "ask",
+    // Never-run commands regardless of auto mode. This is the deterministic
+    // half of the guard; the content-aware half (homographs, pipe-to-shell,
+    // credential leaks, ...) is handled by the tirith-guard plugin below.
+    "bash": {
+      "git status*": "allow",
+      "git diff*": "allow",
+      "git log*": "allow",
+      "ls*": "allow",
+      "cat*": "allow",
+      "grep*": "allow",
+      "rg*": "allow",
+      "head*": "allow",
+      "tail*": "allow",
+      "wc*": "allow",
+      // catch-all: anything not matched above asks for approval
+      "*": "ask",
+      // policy-level prohibitions — stay deny even when auto mode approves
+      "rm -rf *": "deny",
+      "rm -fr *": "deny",
+      "sudo *": "deny",
+      "git push --force*": "deny",
+      "git push -f*": "deny",
+      "git reset --hard*": "deny",
+      "git clean -fdx*": "deny",
+      "mkfs*": "deny",
+      "shutdown*": "deny",
+      "reboot*": "deny"
+    }
   },
+
+  // --- tirith-guard plugin (optional but recommended) ---
+  // Guards every `bash` tool call with Tirith before it runs: blocks on
+  // findings at/above HIGH severity (homographs, pipe-to-shell, data
+  // exfiltration, credential leaks, ...). Fail-open by default — if tirith is
+  // not installed the plugin just logs a warn and lets the command through.
+  //   1. Install tirith once:  brew install sheeki03/tap/tirith
+  //   2. Point this at your clone of the bundle repo:
+  // "plugin": [
+  //   "file:///absolute/path/to/switchyard-opencode-bundle/plugin/tirith-guard/index.ts"
+  // ],
+  // Tune via env vars in your shell profile: TIRITH_GUARD_SEVERITY (HIGH),
+  // TIRITH_GUARD_TIMEOUT_MS (5000), TIRITH_GUARD_FAIL_MODE (open|closed),
+  // TIRITH_BIN. See plugin/tirith-guard/README.md.
 
   // --- Switchyard router (this bundle) ---
   "provider": {

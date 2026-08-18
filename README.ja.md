@@ -294,6 +294,20 @@ codex mcp add nvidia-rag --url "http://<rag-service-host>:8091/mcp"
 
 opencode と Claude Code は設定・プラグインディレクトリがバンドルを直接指しているため `git pull` だけで反映されます。Codex の symlink も同様に追随しますが、このリリース以前の設定では `using-bee` の symlink を追加してください。`mcp.json.example` が変わったリリースでは、手元の `mcp.json` への反映を確認してください。
 
+## tirith-guard（任意・opencode 推奨）
+
+[`plugin/tirith-guard/`](plugin/tirith-guard/) は、opencode の `bash` ツール呼び出しを実行前に [Tirith](https://tirith.sh) で検査するプラグインです。`--auto` モードと静的 `permission.bash` の deny ルールが「決定的に悪いコマンド」を止めるのに対し、Tirith は静的 deny で列挙できない領域をカバーします——ホモグラフ / 似せ字 URL（キリル文字の `і` を使った `gіthub.com`）、`curl|bash`、ANSI インジェクション、秘匿情報の漏えい、データ流出など、29 カテゴリ 200 超のルールを完全オフライン・サブミリ秒で判定します。既定は fail-open のため、tirith 未導入でも作業を妨げません。
+
+セットアップ（macOS）:
+
+```sh
+brew install sheeki03/tap/tirith
+# その後 ~/.config/opencode/opencode.json に追記:
+#   "plugin": ["file:///絶対パス/switchyard-opencode-bundle/plugin/tirith-guard/index.ts"]
+```
+
+インストール・チューニング（環境変数）・検証手順: [plugin/tirith-guard/README.md](plugin/tirith-guard/README.md)。
+
 ## Pi（任意の第 2 クライアント）
 
 [Pi](https://pi.dev/) は最小構成のコーディングエージェントハーネスです。JSON 1 枚で同じルーターに接続でき、チームスキル（`rag-kb` / `web-search` / `using-bee`）は Agent Skills 標準のためそのまま共用できます。opencode と比べると、headless の画像入力（`pi -p @img "..."`）が動くこと、`--mode json` の機械可読イベントストリーム、サブスクリプション認証（`/login` で ChatGPT Plus/Pro（Codex）・Claude・Copilot）が加わります。主クライアントは引き続き opencode です。
