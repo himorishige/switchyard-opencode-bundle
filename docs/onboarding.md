@@ -91,13 +91,14 @@ EOF
 
 ## 5. Agent Plugin (team-ai-kb)
 
-Complete ["First-time setup (all clients)"](../README.md#first-time-setup-all-clients) under
-["Agent Plugin (rag-kb / web-search)"](../README.md#agent-plugin-rag-kb--web-search) in the README,
+Complete ["First-time setup (RAG only)"](../README.md#first-time-setup-rag-only) under
+["Agent Plugin (rag-kb / web-search / using-bee)"](../README.md#agent-plugin-rag-kb--web-search--using-bee) in the README,
 then continue to the section for your client ([opencode](../README.md#with-opencode) /
 [Claude Code](../README.md#with-claude-code) / [Codex CLI](../README.md#with-codex-cli)).
 
 - For the endpoint address you fill in after copying `mcp.json.example` to `mcp.json` during the
   first-time setup, follow your team's instructions
+- Backlog / bee uses each user's local CLI authentication, not a shared MCP service
 
 ## 6. Web search key
 
@@ -107,16 +108,21 @@ Either backend works on its own: **Gemini (recommended, has a free tier, 15 min)
 **must be issued from a billing-enabled GCP project** (free-tier keys are used for training); for
 OpenAI, the API excludes your data from training by default.
 
-## 7. Verification checklist
+## 7. Backlog / bee (optional)
 
-| Check                 | Command                                           | Expected                                                           |
-| --------------------- | ------------------------------------------------- | ------------------------------------------------------------------ |
-| Router                | `curl -s http://127.0.0.1:4100/health`            | `{"status":"ok"}`                                                  |
-| Route list            | `curl -s http://127.0.0.1:4100/v1/models`         | auto / auto-esc / strong-only / weak-only / k3-only / qwen3.7-plus |
-| opencode              | `opencode run -m switchyard/auto "hello"`         | a response comes back                                              |
-| AGENTS.md             | `ls ~/.config/opencode/AGENTS.md`                 | the file exists                                                    |
-| Environment variables | `env \| grep OPENCODE_`                           | the values from step 3                                             |
-| Web search            | the verification step in web-search-onboarding.md | an answer, `Sources:`, and a stats line                            |
+If you want agents to work with Backlog, follow [backlog-bee-onboarding.md](./backlog-bee-onboarding.md). The `using-bee` skill is already bundled, so clients that already read `plugin/team-ai-kb/skills` pick it up after `git pull` and restart.
+
+## 8. Verification checklist
+
+| Check                 | Command                                            | Expected                                                           |
+| --------------------- | -------------------------------------------------- | ------------------------------------------------------------------ |
+| Router                | `curl -s http://127.0.0.1:4100/health`             | `{"status":"ok"}`                                                  |
+| Route list            | `curl -s http://127.0.0.1:4100/v1/models`          | auto / auto-esc / strong-only / weak-only / k3-only / qwen3.7-plus |
+| opencode              | `opencode run -m switchyard/auto "hello"`          | a response comes back                                              |
+| AGENTS.md             | `ls ~/.config/opencode/AGENTS.md`                  | the file exists                                                    |
+| Environment variables | `env \| grep OPENCODE_`                            | the values from step 3                                             |
+| Web search            | the verification step in web-search-onboarding.md  | an answer, `Sources:`, and a stats line                            |
+| Backlog               | the verification step in backlog-bee-onboarding.md | `bee user me --json` and the `using-bee` skill work                |
 
 - After a long idle period the first call can take tens of seconds because of a cold start (a few
   seconds from the second call onward). Adding `--max-time` to your connectivity checks makes it

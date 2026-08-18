@@ -228,19 +228,20 @@ Where it shines: cost-minimal experiments (weak share is structurally maximal), 
 
 The weak tier is text-only — `deepseek-v4-flash-0731` rejects image input outright. Rather than moving the tier to a costlier vision model, the router serves a dedicated vision route (`qwen3.7-plus`) for [Qwen-MM-Plugins](https://github.com/QwenLM/Qwen-MM-Plugins) tools: they show the image to the vision model and hand the brain a text description, so the brain never sees an image and stays on the cheap model. The route ships in `routes.toml` and is inert until you add the plugin's MCP entry to opencode. Setup, costs, and limits (images only): [docs/qwen-mm-plugins.md](docs/qwen-mm-plugins.md).
 
-## Agent Plugin (rag-kb / web-search)
+## Agent Plugin (rag-kb / web-search / using-bee)
 
-`plugin/team-ai-kb/` is a plugin conforming to the [Agent Plugins standard](https://agent-plugins.org/) (v1.0.0). It is optional and independent of the router, bundling two agent skills plus an MCP definition.
+`plugin/team-ai-kb/` is a plugin conforming to the [Agent Plugins standard](https://agent-plugins.org/) (v1.0.0). It is optional and independent of the router, bundling three agent skills plus an MCP definition.
 
 | Component                                  | What it is                                                                                                                                    | Requires                                                                                                    |
 | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | skill `rag-kb`                             | A guide to searching the shared knowledge base (NVIDIA RAG Blueprint) over MCP                                                                | Private-network reach to the RAG service, plus the MCP registration below                                   |
 | skill `web-search` (+ `scripts/search.py`) | Web search backed by Gemini or OpenAI, auto-selected from whichever key is set and called directly with your own key (no intermediary server) | `GEMINI_API_KEY` or `OPENAI_API_KEY`. Setup: [docs/web-search-onboarding.md](docs/web-search-onboarding.md) |
-| `mcp.json`                                 | MCP server definition for `nvidia-rag` (streamable HTTP)                                                                                      | The first-time setup below                                                                                  |
+| skill `using-bee`                          | Backlog operations through the local `bee` CLI: issues, PRs, projects, wikis, documents, and notifications                                    | `bee` installed and authenticated. Setup: [docs/backlog-bee-onboarding.md](docs/backlog-bee-onboarding.md)  |
+| `mcp.json`                                 | MCP server definition for `nvidia-rag` (streamable HTTP)                                                                                      | The RAG first-time setup below                                                                              |
 
-### First-time setup (all clients)
+### First-time setup (RAG only)
 
-The RAG endpoint lives on a private network, so it follows the same convention as `.env`: copy the example and edit it (the real file is gitignored).
+The RAG endpoint lives on a private network, so it follows the same convention as `.env`: copy the example and edit it (the real file is gitignored). Backlog / bee setup is per-user and documented separately in [docs/backlog-bee-onboarding.md](docs/backlog-bee-onboarding.md).
 
 ```bash
 cp plugin/team-ai-kb/mcp.json.example plugin/team-ai-kb/mcp.json
@@ -289,6 +290,7 @@ claude --plugin-dir /path/to/switchyard-opencode-bundle/plugin/team-ai-kb
 ```bash
 ln -s "$(pwd)/plugin/team-ai-kb/skills/rag-kb" ~/.codex/skills/rag-kb
 ln -s "$(pwd)/plugin/team-ai-kb/skills/web-search" ~/.codex/skills/web-search
+ln -s "$(pwd)/plugin/team-ai-kb/skills/using-bee" ~/.codex/skills/using-bee
 codex mcp add nvidia-rag --url "http://<rag-service-host>:8091/mcp"
 ```
 
@@ -296,12 +298,12 @@ For non-interactive runs (`codex exec`), add one line to `[mcp_servers.nvidia-ra
 
 ### Updating
 
-For opencode and Claude Code, `git pull` is enough: the config and the plugin directory both point at the bundle. Codex uses symlinks, which follow the pull just as well. When a release changes `mcp.json.example`, check whether your local `mcp.json` needs the same change.
+For opencode and Claude Code, `git pull` is enough: the config and the plugin directory both point at the bundle. Codex uses symlinks, which follow the pull just as well; add a symlink for `using-bee` if your local setup predates this release. When a release changes `mcp.json.example`, check whether your local `mcp.json` needs the same change.
 
 ## Pi (optional second client)
 
 [Pi](https://pi.dev/) is a minimal coding-agent harness that connects to the same router with a
-single JSON file, and reuses the team skills (`rag-kb` / `web-search`) as-is because they are
+single JSON file, and reuses the team skills (`rag-kb` / `web-search` / `using-bee`) as-is because they are
 standard Agent Skills. Compared to opencode it adds working headless image input
 (`pi -p @img "..."`), a machine-readable `--mode json` event stream, and subscription auth
 (`/login` for ChatGPT Plus/Pro (Codex), Claude, Copilot). opencode remains the primary client.

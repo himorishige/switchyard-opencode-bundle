@@ -228,19 +228,20 @@ id = "accounts/fireworks/models/kimi-k3"
 
 weak tier はテキスト専用です——`deepseek-v4-flash-0731` は画像入力を拒否します。tier ごと vision 対応モデルに替えるのではなく、ルーターが [Qwen-MM-Plugins](https://github.com/QwenLM/Qwen-MM-Plugins) のツール向けに専用の vision route（`qwen3.7-plus`）を提供します。ツールが画像を vision モデルに見せ、脳にはテキストの説明が渡るので、脳は画像を一度も受け取らず安いモデルのままです。route は `routes.toml` に同梱済みで、opencode 側にプラグインの MCP エントリを足すまでは何もしません。セットアップ・コスト・制約（画像のみ）は [docs/qwen-mm-plugins.ja.md](docs/qwen-mm-plugins.ja.md) を参照してください。
 
-## Agent Plugin（rag-kb / web-search）
+## Agent Plugin（rag-kb / web-search / using-bee）
 
-`plugin/team-ai-kb/` は [Agent Plugins 標準](https://agent-plugins.org/)（v1.0.0）準拠のプラグインです。ルーターとは独立したオプションで、エージェント拡張 2 本 + MCP 定義を同梱しています。
+`plugin/team-ai-kb/` は [Agent Plugins 標準](https://agent-plugins.org/)（v1.0.0）準拠のプラグインです。ルーターとは独立したオプションで、エージェント拡張 3 本 + MCP 定義を同梱しています。
 
 | コンポーネント                              | 内容                                                                                                                  | 前提                                                                                                                      |
 | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | skill `rag-kb`                              | チーム共通ナレッジ検索（NVIDIA RAG Blueprint の MCP）の使い方ガイド                                                   | RAG サービスへのプライベート網到達 + 下記 MCP 登録                                                                        |
 | skill `web-search`（+ `scripts/search.py`） | Gemini / OpenAI 両対応の web 検索。設定済みのキーからバックエンドを自動選択し、各自のキーで直接呼ぶ（中間サーバなし） | `GEMINI_API_KEY` または `OPENAI_API_KEY`。発行手順 = [docs/web-search-onboarding.ja.md](docs/web-search-onboarding.ja.md) |
-| `mcp.json`                                  | `nvidia-rag`（streamable HTTP）の MCP サーバ定義                                                                      | 下記の初期設定                                                                                                            |
+| skill `using-bee`                           | ローカルの `bee` CLI 経由で Backlog の issue / PR / project / wiki / document / notification を扱う                   | `bee` のインストールと各自の認証。手順 = [docs/backlog-bee-onboarding.ja.md](docs/backlog-bee-onboarding.ja.md)           |
+| `mcp.json`                                  | `nvidia-rag`（streamable HTTP）の MCP サーバ定義                                                                      | RAG 用の初期設定                                                                                                          |
 
-### 初期設定（共通・初回のみ）
+### 初期設定（RAG のみ）
 
-RAG の接続先はプライベート網内のアドレスのため、`.env` と同じ流儀で example からコピーして書き換えます（実ファイルは gitignore 済み）。
+RAG の接続先はプライベート網内のアドレスのため、`.env` と同じ流儀で example からコピーして書き換えます（実ファイルは gitignore 済み）。Backlog / bee の設定はユーザーごとのローカル認証で、[docs/backlog-bee-onboarding.ja.md](docs/backlog-bee-onboarding.ja.md) に分けています。
 
 ```bash
 cp plugin/team-ai-kb/mcp.json.example plugin/team-ai-kb/mcp.json
@@ -283,6 +284,7 @@ claude --plugin-dir /path/to/switchyard-opencode-bundle/plugin/team-ai-kb
 ```bash
 ln -s "$(pwd)/plugin/team-ai-kb/skills/rag-kb" ~/.codex/skills/rag-kb
 ln -s "$(pwd)/plugin/team-ai-kb/skills/web-search" ~/.codex/skills/web-search
+ln -s "$(pwd)/plugin/team-ai-kb/skills/using-bee" ~/.codex/skills/using-bee
 codex mcp add nvidia-rag --url "http://<rag-service-host>:8091/mcp"
 ```
 
@@ -290,11 +292,11 @@ codex mcp add nvidia-rag --url "http://<rag-service-host>:8091/mcp"
 
 ### 更新
 
-opencode と Claude Code は設定・プラグインディレクトリがバンドルを直接指しているため `git pull` だけで反映されます。Codex の symlink も同様に追随します。`mcp.json.example` が変わったリリースでは、手元の `mcp.json` への反映を確認してください。
+opencode と Claude Code は設定・プラグインディレクトリがバンドルを直接指しているため `git pull` だけで反映されます。Codex の symlink も同様に追随しますが、このリリース以前の設定では `using-bee` の symlink を追加してください。`mcp.json.example` が変わったリリースでは、手元の `mcp.json` への反映を確認してください。
 
 ## Pi（任意の第 2 クライアント）
 
-[Pi](https://pi.dev/) は最小構成のコーディングエージェントハーネスです。JSON 1 枚で同じルーターに接続でき、チームスキル（`rag-kb` / `web-search`）は Agent Skills 標準のためそのまま共用できます。opencode と比べると、headless の画像入力（`pi -p @img "..."`）が動くこと、`--mode json` の機械可読イベントストリーム、サブスクリプション認証（`/login` で ChatGPT Plus/Pro（Codex）・Claude・Copilot）が加わります。主クライアントは引き続き opencode です。
+[Pi](https://pi.dev/) は最小構成のコーディングエージェントハーネスです。JSON 1 枚で同じルーターに接続でき、チームスキル（`rag-kb` / `web-search` / `using-bee`）は Agent Skills 標準のためそのまま共用できます。opencode と比べると、headless の画像入力（`pi -p @img "..."`）が動くこと、`--mode json` の機械可読イベントストリーム、サブスクリプション認証（`/login` で ChatGPT Plus/Pro（Codex）・Claude・Copilot）が加わります。主クライアントは引き続き opencode です。
 
 セットアップ: `pi-models.json.example` と `pi-settings.json.example` をコピーし、[docs/pi-onboarding.ja.md](docs/pi-onboarding.ja.md)（15〜20 分）に従ってください。
 
