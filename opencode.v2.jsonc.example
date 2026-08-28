@@ -103,6 +103,21 @@
   // Options: { "scrub": [...globs], "keep": [...names], "maxTimeoutMs": 600000,
   //            "warnExternalCwd": true, "verbose": false } — see plugin/shell-hygiene/README.md.
 
+  // --- permission-judge plugin, V2 only (optional, starts in shadow mode) ---
+  // An LLM judge (router weak-only route) on the permission `evaluate` hook for
+  // requests the rules above leave as `ask`. The judge only ever says allow.
+  //   shadow: judge + log only (default)      assist: ask -> allow when the judge allows
+  //   strict: ask -> allow when the judge allows, otherwise deny with a reason
+  //           (for `opencode2 run --auto`, where a leftover ask is executed)
+  // Load it AFTER tirith-guard so it never touches a Tirith deny:
+  // "plugins": [
+  //   "file:///absolute/path/to/switchyard-opencode-bundle/plugin/shell-hygiene/index.ts",
+  //   "file:///absolute/path/to/switchyard-opencode-bundle/plugin/tirith-guard/v2.ts",
+  //   { "package": "file:///absolute/path/to/switchyard-opencode-bundle/plugin/permission-judge/index.ts",
+  //     "options": { "mode": "shadow", "policyFile": "/absolute/path/to/team-policy.md" } }
+  // ],
+  // Judgements go to $XDG_DATA_HOME/opencode/permission-judge.jsonl — see plugin/permission-judge/README.md.
+
   // --- Switchyard router (this bundle) ---
   // V1 `provider.<id>.npm/options` became `providers.<id>.package/settings`.
   // The built-in OpenAI-compatible package replaces @ai-sdk/openai-compatible.
