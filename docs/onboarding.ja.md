@@ -38,6 +38,8 @@ README「opencode 側の設定」の A（そのまま上書き）/ B（既存カ
 - 必ず **Global スコープ**（`~/.config/opencode/`）に置きます。プロジェクト側の opencode.json は
   Global を上書きするため、プライバシー設定が抜け落ちる原因になります
 - `.json` と `.jsonc` を両方置かないでください（どちらか一方のみ）
+- OpenCode 2（`opencode2`・beta）はトライアルの対象外です。opencode 1.x と共存インストールでき、同じファイルを読むので試しても
+  害はありません。試す前に README「opencode 側の設定」の OpenCode 2 の注記を読んでください
 
 ## 3. シェル環境変数（strict-privacy）
 

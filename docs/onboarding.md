@@ -40,6 +40,9 @@ path B (merge into your existing config) from "Configuring opencode" in the READ
 - It must go in the **global scope** (`~/.config/opencode/`). A project-level opencode.json overrides
   the global one, which is how privacy settings quietly go missing
 - Do not keep both `.json` and `.jsonc` — pick one
+- OpenCode 2 (`opencode2`, beta) is not the trial target. It installs side by side with opencode 1.x and reads the
+  same file, so trying it does no harm — see the "OpenCode 2" note under "Configuring opencode" in the README first
+
 
 ## 3. Shell environment variables (strict-privacy)
 
