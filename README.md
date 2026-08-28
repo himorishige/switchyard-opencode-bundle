@@ -329,6 +329,30 @@ key instead (see `opencode.v2.jsonc.example`).
 
 Full install, tuning (env vars), and a verification checklist: [`plugin/tirith-guard/README.md`](plugin/tirith-guard/README.md).
 
+## shell-hygiene (OpenCode 2 only)
+
+[`plugin/shell-hygiene/`](plugin/shell-hygiene/) is the environment half of the guard for OpenCode 2. It hooks
+`shell.create.before` and, for every shell command, removes credentials the agent's shell never needs from the command
+environment (`FIREWORKS_*`, cloud session tokens, `*_PASSWORD`, `*_PRIVATE_KEY`, ...), caps the per-command timeout,
+and logs commands that run outside the project. It never blocks anything — that is what the `permissions` rules and
+tirith-guard do — but it makes `env | grep KEY` come back empty. Keys the shipped skills need (`GEMINI_API_KEY`,
+`OPENAI_API_KEY`, `BACKLOG_API_KEY`) are left alone.
+
+```jsonc
+// ~/.config/opencode/opencode.jsonc (opencode2) — load it first so later plugins see the cleaned environment
+"plugins": [
+  "file:///abs/path/to/switchyard-opencode-bundle/plugin/shell-hygiene/index.ts",
+  "file:///abs/path/to/switchyard-opencode-bundle/plugin/tirith-guard/v2.ts"
+]
+```
+
+Options (`scrub` / `keep` / `maxTimeoutMs` / `warnExternalCwd` / `verbose`) and verification:
+[`plugin/shell-hygiene/README.md`](plugin/shell-hygiene/README.md).
+
+The V2 policy pack in `opencode.v2.jsonc.example` also allows the bundle's read-only MCP tools (`nvidia_rag_*`,
+`qwen_mm_plugins_api_*`), denies Code Mode (`execute`), and removes `shell` from the `explore` / `general` subagents —
+a denied action disappears from the model's tool list, so the subagent never even sees it.
+
 ## Pi (optional second client)
 
 [Pi](https://pi.dev/) is a minimal coding-agent harness that connects to the same router with a

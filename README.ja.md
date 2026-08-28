@@ -318,6 +318,30 @@ OpenCode 2（opencode2・beta）は v1 plugin を読み込めません。`plugin
 
 インストール・チューニング（環境変数）・検証手順: [plugin/tirith-guard/README.md](plugin/tirith-guard/README.md)。
 
+## shell-hygiene（OpenCode 2 専用）
+
+[`plugin/shell-hygiene/`](plugin/shell-hygiene/) は OpenCode 2 向けのガードの「環境」側です。`shell.create.before` を
+フックし、すべてのシェルコマンドについて、エージェントのシェルが必要としない秘密情報（`FIREWORKS_*`、クラウドの
+セッショントークン、`*_PASSWORD`、`*_PRIVATE_KEY` など）をコマンド環境から削除し、コマンドごとの timeout に上限を
+かけ、プロジェクト外で動くコマンドをログに残します。ブロックはしません（それは `permissions` ルールと tirith-guard
+の仕事です）が、`env | grep KEY` が空で返るようになります。同梱 skill が使う `GEMINI_API_KEY` / `OPENAI_API_KEY` /
+`BACKLOG_API_KEY` は削除しません。
+
+```jsonc
+// ~/.config/opencode/opencode.jsonc（opencode2）— 後続の plugin が整えた環境を見られるよう先頭に置く
+"plugins": [
+  "file:///絶対パス/switchyard-opencode-bundle/plugin/shell-hygiene/index.ts",
+  "file:///絶対パス/switchyard-opencode-bundle/plugin/tirith-guard/v2.ts"
+]
+```
+
+オプション（`scrub` / `keep` / `maxTimeoutMs` / `warnExternalCwd` / `verbose`）と動作確認:
+[plugin/shell-hygiene/README.md](plugin/shell-hygiene/README.md)。
+
+`opencode.v2.jsonc.example` の v2 policy pack では、バンドルの読み取り専用 MCP ツール（`nvidia_rag_*`、
+`qwen_mm_plugins_api_*`）を allow、Code Mode（`execute`）を deny、`explore` / `general` subagent から `shell` を
+外しています。deny されたアクションはモデルのツール一覧から消えるため、subagent は shell の存在すら見ません。
+
 ## Pi（任意の第 2 クライアント）
 
 [Pi](https://pi.dev/) は最小構成のコーディングエージェントハーネスです。JSON 1 枚で同じルーターに接続でき、チームスキル（`rag-kb` / `web-search` / `using-bee`）は Agent Skills 標準のためそのまま共用できます。opencode と比べると、headless の画像入力（`pi -p @img "..."`）が動くこと、`--mode json` の機械可読イベントストリーム、サブスクリプション認証（`/login` で ChatGPT Plus/Pro（Codex）・Claude・Copilot）が加わります。主クライアントは引き続き opencode です。

@@ -57,8 +57,24 @@
     { "action": "shell", "resource": "git clean -fdx*", "effect": "deny" },
     { "action": "shell", "resource": "mkfs*", "effect": "deny" },
     { "action": "shell", "resource": "shutdown*", "effect": "deny" },
-    { "action": "shell", "resource": "reboot*", "effect": "deny" }
+    { "action": "shell", "resource": "reboot*", "effect": "deny" },
+
+    // MCP tools are permission actions named <server>_<tool> (characters that
+    // are not allowed become _). Read-only servers shipped or documented by
+    // this bundle are allowed outright; any other MCP tool keeps the built-in
+    // default (ask). Add a rule here when you connect a new server.
+    { "action": "nvidia_rag_*", "resource": "*", "effect": "allow" },
+    { "action": "qwen_mm_plugins_api_*", "resource": "*", "effect": "allow" },
+
+    // Code Mode (`execute`) lets the model run generated code that dispatches
+    // tools programmatically. Each nested tool still checks its own rules, but
+    // it is one more surface to reason about, so it stays off during the trial.
+    { "action": "execute", "resource": "*", "effect": "deny" }
   ],
+
+  // Saved approvals ("Allow always" in the TUI) are project-scoped extra allow
+  // rules. They can never override a deny above, so growing your own allowlist
+  // this way is safe. Review them with:  opencode2 api GET /api/permission/saved
 
   // --- tirith-guard plugin, V2 build (optional but recommended) ---
   // Same guard as the V1 plugin, ported to the V2 plugin API: it hooks the
@@ -71,6 +87,21 @@
   // Tuning: the same env vars as V1 (TIRITH_BIN, TIRITH_GUARD_SEVERITY,
   // TIRITH_GUARD_TIMEOUT_MS, TIRITH_GUARD_FAIL_MODE), or plugin options:
   // "plugins": [{ "package": "file:///.../v2.ts", "options": { "severity": "MEDIUM" } }]
+
+  // --- shell-hygiene plugin, V2 only (optional but recommended) ---
+  // Runs before every shell command (even ones that end up denied): removes
+  // credentials the agent's shell never needs from the command environment
+  // (FIREWORKS_*, cloud session tokens, *_PASSWORD, *_PRIVATE_KEY, ...), caps
+  // the per-command timeout, and warns when a command runs outside the
+  // project. Keys used by the shipped skills (GEMINI_API_KEY, OPENAI_API_KEY,
+  // BACKLOG_API_KEY) are deliberately left alone. Load it first so later
+  // plugins see the cleaned environment:
+  // "plugins": [
+  //   "file:///absolute/path/to/switchyard-opencode-bundle/plugin/shell-hygiene/index.ts",
+  //   "file:///absolute/path/to/switchyard-opencode-bundle/plugin/tirith-guard/v2.ts"
+  // ],
+  // Options: { "scrub": [...globs], "keep": [...names], "maxTimeoutMs": 600000,
+  //            "warnExternalCwd": true, "verbose": false } — see plugin/shell-hygiene/README.md.
 
   // --- Switchyard router (this bundle) ---
   // V1 `provider.<id>.npm/options` became `providers.<id>.package/settings`.
@@ -128,10 +159,21 @@
   //   inheritance from the caller, so reading grep output is never billed at
   //   K3's output rate. There is no built-in `scout` agent in V2
   // - title: V1 `small_model` became the model of the built-in title agent
+  //
+  // Agent `permissions` are appended after the global array, so they narrow
+  // it. Subagents do not get a shell: `explore` is read-only by default and
+  // `general` is the research/multi-step worker — neither needs to run
+  // commands, and a subagent's own rules are what apply (not the caller's).
   "agents": {
     "plan": { "model": "switchyard/k3-only" },
-    "explore": { "model": "switchyard/weak-only" },
-    "general": { "model": "switchyard/weak-only" },
+    "explore": {
+      "model": "switchyard/weak-only",
+      "permissions": [{ "action": "shell", "resource": "*", "effect": "deny" }]
+    },
+    "general": {
+      "model": "switchyard/weak-only",
+      "permissions": [{ "action": "shell", "resource": "*", "effect": "deny" }]
+    },
     "title": { "model": "switchyard/weak-only" }
   }
 }
