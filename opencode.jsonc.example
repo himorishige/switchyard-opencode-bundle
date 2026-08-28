@@ -72,6 +72,8 @@
   // Tune via env vars in your shell profile: TIRITH_GUARD_SEVERITY (HIGH),
   // TIRITH_GUARD_TIMEOUT_MS (5000), TIRITH_GUARD_FAIL_MODE (open|closed),
   // TIRITH_BIN. See plugin/tirith-guard/README.md.
+  // OpenCode 2 (opencode2, beta) cannot load this v1 plugin; it has its own
+  // build at plugin/tirith-guard/v2.ts — see opencode.v2.jsonc.example.
 
   // --- Switchyard router (this bundle) ---
   "provider": {
@@ -84,31 +86,55 @@
         // The real Fireworks key lives only in the container's .env.
         "apiKey": "local-dummy"
       },
+      // Every route declares `tool_call` and `modalities` explicitly. This
+      // matters because opencode 1.x and OpenCode 2 (opencode2, beta) fill in
+      // opposite defaults for a custom model that says nothing:
+      //   - opencode 1.x: no `modalities` = text-only (images are dropped)
+      //   - opencode2:    no capabilities = tools + text + IMAGE input, and a
+      //                   `modalities`-only entry is read as tool_call: false
+      // Left implicit, opencode2 would send screenshots to the text-only tiers
+      // (upstream 400) and disable tool calling on k3-only. Declaring the real
+      // capabilities keeps this one file correct on both versions.
       "models": {
-        "auto": { "name": "auto — Switchyard routing" },
+        "auto": {
+          "name": "auto — Switchyard routing",
+          "tool_call": true,
+          "modalities": { "input": ["text"], "output": ["text"] }
+        },
         // Opt-in: weak-first with evidence-based escalation to strong (latches
         // per session after a clear pattern of trouble). Buffered streaming
         // until the latch — see README "Evidence-based escalation".
-        "auto-esc": { "name": "auto-esc — weak-first, escalates on trouble" },
-        // Deliberately NO modalities here: deepseek-v4-pro-0813 rejects image
-        // input. Declaring it would let opencode send a screenshot upstream,
+        "auto-esc": {
+          "name": "auto-esc — weak-first, escalates on trouble",
+          "tool_call": true,
+          "modalities": { "input": ["text"], "output": ["text"] }
+        },
+        // Text-only on purpose: deepseek-v4-pro-0813 rejects image input.
+        // Declaring image here would let opencode send a screenshot upstream,
         // which fails with a 400. Attach images on k3-only instead.
         "strong-only": {
-          "name": "strong-only — deepseek-v4-pro-0813 pinned"
+          "name": "strong-only — deepseek-v4-pro-0813 pinned",
+          "tool_call": true,
+          "modalities": { "input": ["text"], "output": ["text"] }
         },
-        // Deliberately NO modalities on auto / auto-esc / weak-only either: the
-        // weak tier (deepseek-v4-flash-0731) rejects image input outright.
-        // Declaring it there would let opencode send a screenshot into a
-        // session already pinned to weak, which fails with an upstream 400.
-        "weak-only": { "name": "weak-only — deepseek-v4-flash-0731 pinned" },
+        // Text-only on auto / auto-esc / weak-only as well: the weak tier
+        // (deepseek-v4-flash-0731) rejects image input outright. Declaring
+        // image there would let opencode send a screenshot into a session
+        // already pinned to weak, which fails with an upstream 400.
+        "weak-only": {
+          "name": "weak-only — deepseek-v4-flash-0731 pinned",
+          "tool_call": true,
+          "modalities": { "input": ["text"], "output": ["text"] }
+        },
         // Kimi K3, pinned — its own target since strong moved to
         // deepseek-v4-pro-0813 (2026-08-14). The plan agent points here, and
-        // this is the manual lane for image attachments: `modalities` is what
-        // makes opencode send an image at all — without it an attachment is
-        // dropped and the model answers "I cannot read images", however capable
-        // the upstream model is. Kimi K3 reads images.
+        // this is the manual lane for image attachments: the image modality is
+        // what makes opencode send an image at all — without it an attachment
+        // is dropped and the model answers "I cannot read images", however
+        // capable the upstream model is. Kimi K3 reads images.
         "k3-only": {
           "name": "k3-only — kimi-k3 pinned (plan/vision)",
+          "tool_call": true,
           "modalities": { "input": ["text", "image"], "output": ["text"] }
         }
       }

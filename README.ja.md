@@ -93,6 +93,13 @@ curl -s http://127.0.0.1:4100/v1/models | head
 
 `opencode.jsonc.example` の内容を **Global 設定**（`~/.config/opencode/opencode.json`）に反映します。opencode は JSONC（コメント付き JSON）を正式サポートしているので、コメントはそのままで有効です。反映方法は 2 通りあります。
 
+> **OpenCode 2（opencode2・beta）:** このファイルは OpenCode 2 でもそのまま使えます（同じ場所の v1 形式キーを
+> 読み、メモリ内で正規化します）。各 route が `tool_call` / `modalities` を明示するようにしたのは、OpenCode 2 が
+> 未宣言のカスタムモデルを「tools + text + **image** 入力可」とみなすためです（スクリーンショットがテキスト専用 tier に
+> 届いて 400 になります）。v2 ネイティブ形式は `opencode.v2.jsonc.example`、tirith-guard の v2 版は
+> `plugin/tirith-guard/v2.ts` にあります。トライアルの対象は opencode 1.x で、v2 対応は設定・plugin API が beta の間は
+> ベストエフォートです。
+
 ### A. そのまま上書きする（新規、または strict-privacy 推奨構成のみで運用中）
 
 `opencode.jsonc.example` は、[opencode-with-strict-privacy](https://github.com/cm-dyoshikawa/opencode-with-strict-privacy/blob/main/README.ja.md) の推奨グローバル設定と Switchyard の接続設定を**マージ済みの完成形**です。Global 設定が未作成、または strict-privacy の推奨構成のままなら、コピーするだけで完了します。
@@ -305,6 +312,9 @@ brew install sheeki03/tap/tirith
 # その後 ~/.config/opencode/opencode.json に追記:
 #   "plugin": ["file:///絶対パス/switchyard-opencode-bundle/plugin/tirith-guard/index.ts"]
 ```
+
+OpenCode 2（opencode2・beta）は v1 plugin を読み込めません。`plugins` キーで v2 版 `plugin/tirith-guard/v2.ts` を
+指定してください（`opencode.v2.jsonc.example` 参照）。
 
 インストール・チューニング（環境変数）・検証手順: [plugin/tirith-guard/README.md](plugin/tirith-guard/README.md)。
 

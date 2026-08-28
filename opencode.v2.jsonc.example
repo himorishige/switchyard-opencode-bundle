@@ -1,0 +1,137 @@
+{
+  // OpenCode 2 (opencode2, beta) global config — ~/.config/opencode/opencode.jsonc
+  //
+  // This is the native V2 shape of opencode.jsonc.example. You do NOT need it
+  // to try opencode2: V2 reads the V1-shaped file from the same location and
+  // normalizes it in memory. Use this file when you have decided to move a
+  // machine to V2 for good, or when you want to see what the V1 keys turn into.
+  //
+  // Do not point opencode 1.x at this file — `permissions`, `providers`,
+  // `agents` and `plugins` are V2-only keys.
+  //
+  // Status (2026-08-28, opencode2 0.0.0-beta-18414): configuration, permission
+  // and plugin APIs are still labelled beta upstream and may change. The
+  // Switchyard router itself is unaffected — it is a plain OpenAI-compatible
+  // endpoint on either version.
+  "$schema": "https://opencode.ai/config.json",
+
+  // --- recommended global settings from opencode-with-strict-privacy ---
+  // https://github.com/cm-dyoshikawa/opencode-with-strict-privacy
+  // The environment-variable half (OPENCODE_ENABLE_EXA=0 and friends) is not
+  // part of this file. Set those in your shell startup file separately.
+  "share": "disabled",
+  "autoupdate": false,
+
+  // V2 permissions are ONE ordered array. The last matching rule wins, so
+  // broad rules go first and exceptions later. Action names changed from V1:
+  // bash -> shell, task -> subagent, write/patch -> edit. The V1 `tools`
+  // block (websearch: false) is expressed as a deny rule here.
+  "permissions": [
+    // websearch sends queries to the hosted Exa/Parallel MCP, so it is denied
+    { "action": "websearch", "resource": "*", "effect": "deny" },
+    { "action": "webfetch", "resource": "*", "effect": "ask" },
+
+    // shell: catch-all first, then the read-only commands that may run freely
+    { "action": "shell", "resource": "*", "effect": "ask" },
+    { "action": "shell", "resource": "git status*", "effect": "allow" },
+    { "action": "shell", "resource": "git diff*", "effect": "allow" },
+    { "action": "shell", "resource": "git log*", "effect": "allow" },
+    { "action": "shell", "resource": "ls*", "effect": "allow" },
+    { "action": "shell", "resource": "cat*", "effect": "allow" },
+    { "action": "shell", "resource": "grep*", "effect": "allow" },
+    { "action": "shell", "resource": "rg*", "effect": "allow" },
+    { "action": "shell", "resource": "head*", "effect": "allow" },
+    { "action": "shell", "resource": "tail*", "effect": "allow" },
+    { "action": "shell", "resource": "wc*", "effect": "allow" },
+
+    // Never-run commands regardless of --auto. This is the deterministic half
+    // of the guard: an explicit deny is final and is never sent to plugins.
+    // The content-aware half (homographs, pipe-to-shell, credential leaks, ...)
+    // is the tirith-guard plugin below, which hooks the permission decision.
+    { "action": "shell", "resource": "rm -rf *", "effect": "deny" },
+    { "action": "shell", "resource": "rm -fr *", "effect": "deny" },
+    { "action": "shell", "resource": "sudo *", "effect": "deny" },
+    { "action": "shell", "resource": "git push --force*", "effect": "deny" },
+    { "action": "shell", "resource": "git push -f*", "effect": "deny" },
+    { "action": "shell", "resource": "git reset --hard*", "effect": "deny" },
+    { "action": "shell", "resource": "git clean -fdx*", "effect": "deny" },
+    { "action": "shell", "resource": "mkfs*", "effect": "deny" },
+    { "action": "shell", "resource": "shutdown*", "effect": "deny" },
+    { "action": "shell", "resource": "reboot*", "effect": "deny" }
+  ],
+
+  // --- tirith-guard plugin, V2 build (optional but recommended) ---
+  // Same guard as the V1 plugin, ported to the V2 plugin API: it hooks the
+  // permission `evaluate` step for every `shell` action and turns the decision
+  // into deny when Tirith reports a finding at/above HIGH. Fail-open by
+  // default. Install tirith once (brew install sheeki03/tap/tirith), then:
+  // "plugins": [
+  //   "file:///absolute/path/to/switchyard-opencode-bundle/plugin/tirith-guard/v2.ts"
+  // ],
+  // Tuning: the same env vars as V1 (TIRITH_BIN, TIRITH_GUARD_SEVERITY,
+  // TIRITH_GUARD_TIMEOUT_MS, TIRITH_GUARD_FAIL_MODE), or plugin options:
+  // "plugins": [{ "package": "file:///.../v2.ts", "options": { "severity": "MEDIUM" } }]
+
+  // --- Switchyard router (this bundle) ---
+  // V1 `provider.<id>.npm/options` became `providers.<id>.package/settings`.
+  // The built-in OpenAI-compatible package replaces @ai-sdk/openai-compatible.
+  "providers": {
+    "switchyard": {
+      "name": "Switchyard (Fireworks auto-routing)",
+      "package": "@opencode-ai/ai/providers/openai-compatible",
+      "settings": {
+        "baseURL": "http://127.0.0.1:4100/v1",
+        // The router does not validate the key, so a dummy value is fine.
+        // The real Fireworks key lives only in the container's .env.
+        "apiKey": "local-dummy"
+      },
+      // V2 assumes tools + text + IMAGE input for a custom model that declares
+      // nothing, so every route states its real capabilities. The text-only
+      // tiers (deepseek-v4-pro-0813 / deepseek-v4-flash-0731) reject image
+      // input with a 400; only k3-only (Kimi K3) reads images.
+      "models": {
+        "auto": {
+          "name": "auto — Switchyard routing",
+          "capabilities": { "tools": true, "input": ["text"], "output": ["text"] }
+        },
+        // Opt-in: weak-first with evidence-based escalation to strong (latches
+        // per session after a clear pattern of trouble). Buffered streaming
+        // until the latch — see README "Evidence-based escalation".
+        "auto-esc": {
+          "name": "auto-esc — weak-first, escalates on trouble",
+          "capabilities": { "tools": true, "input": ["text"], "output": ["text"] }
+        },
+        "strong-only": {
+          "name": "strong-only — deepseek-v4-pro-0813 pinned",
+          "capabilities": { "tools": true, "input": ["text"], "output": ["text"] }
+        },
+        "weak-only": {
+          "name": "weak-only — deepseek-v4-flash-0731 pinned",
+          "capabilities": { "tools": true, "input": ["text"], "output": ["text"] }
+        },
+        // Kimi K3, pinned — the plan agent points here, and this is the manual
+        // lane for image attachments.
+        "k3-only": {
+          "name": "k3-only — kimi-k3 pinned (plan/vision)",
+          "capabilities": { "tools": true, "input": ["text", "image"], "output": ["text"] }
+        }
+      }
+    }
+  },
+
+  // Default model = automatic routing
+  "model": "switchyard/auto",
+
+  // Per-agent pinning, enabled by default (V1 `agent` became `agents`).
+  // - plan: wired straight to Kimi K3 (k3-only) for sparring/planning quality
+  // - explore / general: V2 subagents. Pinning weak explicitly cuts model
+  //   inheritance from the caller, so reading grep output is never billed at
+  //   K3's output rate. There is no built-in `scout` agent in V2
+  // - title: V1 `small_model` became the model of the built-in title agent
+  "agents": {
+    "plan": { "model": "switchyard/k3-only" },
+    "explore": { "model": "switchyard/weak-only" },
+    "general": { "model": "switchyard/weak-only" },
+    "title": { "model": "switchyard/weak-only" }
+  }
+}

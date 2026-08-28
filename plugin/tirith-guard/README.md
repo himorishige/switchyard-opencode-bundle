@@ -13,6 +13,11 @@ This is the **content-aware** half of the guard. The deterministic half is the
 — commands that must never run regardless of content stay `deny`, even when
 opencode runs in auto-approve mode.
 
+**OpenCode 2 (opencode2, beta):** the V1 plugin API does not load on OpenCode 2. Use
+[`v2.ts`](v2.ts) instead — same behaviour and env vars, hooked into the V2 permission
+`evaluate` step (`"plugins": ["file:///abs/path/to/switchyard-opencode-bundle/plugin/tirith-guard/v2.ts"]`).
+Details in the "OpenCode 2 で使う" section below.
+
 ---
 
 ### 日本語（Japanese）
@@ -102,6 +107,28 @@ opencode 内で上記ホモグラフの `curl | bash` を実行させ、ブロ�
   allowlist・カスタムルール・`fail_mode`）すれば、各検査に反映されます。
 - `TIRITH=0` を先頭に付ける bypass は Tirith の通常の単発エスケープハッチです。ポリシーで
   `allow_bypass_env: false` にしない限り既定で有効です。
+
+## OpenCode 2（opencode2・beta）で使う
+
+OpenCode 2 は v1 plugin API を読み込めません（`index.ts` は `failed to load plugin` になります）。
+同じ挙動を v2 plugin API に移植した [`v2.ts`](v2.ts) を使ってください。
+
+```jsonc
+"plugins": [
+  "file:///絶対パス/switchyard-opencode-bundle/plugin/tirith-guard/v2.ts"
+]
+```
+
+- 仕組み: v2 では静的 `permissions` ルールの評価後に plugin の `permission.evaluate` hook が走ります。
+  `shell` アクションのコマンド文字列を tirith に渡し、閾値以上の finding があれば決定を `deny` に
+  書き換え、理由を `message` として返します。明示 deny は hook に来ないため、静的 deny 層は plugin と
+  独立に生き続けます。`--auto` でも hook は通ります
+- 設定: 環境変数は v1 と同じです。加えて plugin options でも指定でき、options が優先されます
+  （`{ "package": "file:///…/v2.ts", "options": { "bin": "…", "severity": "HIGH", "timeoutMs": 5000, "failMode": "open" } }`）
+- 検証済み（2026-08-28、opencode2 0.0.0-beta-18414）: `--auto` 実行で HIGH finding のコマンドが
+  `permission.rejected` として止まり、理由がモデルに返ること。finding のないコマンドは通ること
+- 注意: v2 の plugin API は beta で変わりうる前提です。`v2.ts` は SDK を型としてだけ import します
+  （`file://` plugin からは `@opencode-ai/plugin` の実行時 import が解決できないため）
 
 ## ライセンス
 

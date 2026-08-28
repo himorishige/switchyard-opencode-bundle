@@ -93,6 +93,13 @@ Once that works, move on to configuring opencode.
 
 Apply the contents of `opencode.jsonc.example` to your **Global config** (`~/.config/opencode/opencode.json`). opencode officially supports JSONC, so the comments can stay as they are. There are two ways to do this.
 
+> **OpenCode 2 (opencode2, beta):** this file works unchanged on OpenCode 2 — it reads the V1 keys from the same
+> location and normalizes them in memory. Every route now declares `tool_call` / `modalities` explicitly, because
+> OpenCode 2 assumes tools + text + **image** input for an undeclared custom model (screenshots would reach the
+> text-only tiers and fail with a 400). The native V2 shape is in `opencode.v2.jsonc.example`, and tirith-guard has a
+> V2 build (`plugin/tirith-guard/v2.ts`). The trial targets opencode 1.x; V2 support is best-effort while its config
+> and plugin APIs are beta.
+
 ### A. Overwrite with the bundled config
 
 `opencode.jsonc.example` is a **ready-to-use merge** of the recommended global settings from [opencode-with-strict-privacy](https://github.com/cm-dyoshikawa/opencode-with-strict-privacy) and the Switchyard connection settings. If you have no global config yet, or you are running the strict-privacy recommendations unmodified, copying the file is all it takes.
@@ -316,6 +323,9 @@ brew install sheeki03/tap/tirith
 # then add to ~/.config/opencode/opencode.json:
 #   "plugin": ["file:///abs/path/to/switchyard-opencode-bundle/plugin/tirith-guard/index.ts"]
 ```
+
+OpenCode 2 (opencode2, beta) cannot load V1 plugins — use the V2 build `plugin/tirith-guard/v2.ts` with the `plugins`
+key instead (see `opencode.v2.jsonc.example`).
 
 Full install, tuning (env vars), and a verification checklist: [`plugin/tirith-guard/README.md`](plugin/tirith-guard/README.md).
 
