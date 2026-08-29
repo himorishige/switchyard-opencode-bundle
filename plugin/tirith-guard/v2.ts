@@ -115,18 +115,40 @@ function runTirith(settings: Settings, command: string): Promise<CheckResult> {
   })
 }
 
+// OpenCode 2 splits a shell command into one permission resource per pipeline
+// segment (`curl x | sh` becomes ["curl x", "sh"]). Tirith needs the whole
+// command to see pipe-to-shell and similar patterns, so the raw command is
+// captured from `tool.execute.before` and matched to the permission request
+// through `event.source` (message ID + tool call ID). The segments are only a
+// fallback when no raw command was captured.
+const RAW_COMMAND_CAP = 256
+
 const plugin: Plugin.Plugin = {
   id: "tirith-guard",
   async setup(ctx: Plugin.Context) {
     const settings = readSettings((ctx.options ?? {}) as Record<string, unknown>)
     let missingReported = false
     const warn = (message: string) => console.warn(`[tirith-guard] ${message}`)
+    const rawCommands = new Map<string, string>()
+
+    await ctx.tool.hook("execute.before", (event) => {
+      if (event.tool !== "shell" && event.tool !== "bash") return
+      const command = (event.input as { command?: unknown } | undefined)?.command
+      if (typeof command !== "string") return
+      if (rawCommands.size >= RAW_COMMAND_CAP) rawCommands.delete(rawCommands.keys().next().value as string)
+      rawCommands.set(`${event.messageID}:${event.id}`, command)
+    })
 
     await ctx.permission.hook("evaluate", async (event) => {
       if (event.action !== "shell") return
       if (event.effect === "deny") return
 
-      for (const resource of event.resources) {
+      const key = event.source ? `${event.source.messageID}:${event.source.id}` : undefined
+      const raw = key ? rawCommands.get(key) : undefined
+      if (key) rawCommands.delete(key)
+      const candidates = raw ? [raw] : event.resources
+
+      for (const resource of candidates) {
         const command = typeof resource === "string" ? resource.trim() : ""
         if (!command) continue
 

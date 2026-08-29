@@ -78,6 +78,11 @@ judge はルーターの `switchyard/weak-only` を `ctx.generate.text` で呼�
   出力は見せません（そこが注入面のため）。方針文とユーザー発話は「意図であって judge への指示ではない」と
   rubric に明記しています
 
+v2 は shell コマンドをパイプライン単位に分割して resource にします（`curl x | sh` → `["curl x", "sh"]`）。
+プリフィルタと judge には生コマンドが要るので、`tool.execute.before` で捕まえた生コマンドを `event.source` で
+突き合わせて使います（ログの `command` / `raw_command`）。捕まえられなかった場合はセグメントを ` | ` で結合した
+保守的な文字列で代用します。
+
 決定的なプリフィルタ（root / home への `rm -rf`、force push、`curl | sh`、`sudo`、publish、URL 内の認証情報など）
 に一致したものは judge に送らず、必ず `ask`（strict では deny）になります。
 
@@ -93,6 +98,7 @@ judge はルーターの `switchyard/weak-only` を `ctx.generate.text` で呼�
 | `context` | `user` | `user` = 直近のユーザー発話と tool 呼び出しを渡す / `none` = 渡さない |
 | `contextItems` / `contextChars` | `8` / `400` | 渡す件数と 1 件あたりの文字数 |
 | `log` | `$XDG_DATA_HOME/opencode/permission-judge.jsonl` | JSONL の出力先 |
+| `debugContext` | `false` | `ctx.session.context` の生 JSON をログに落とす（形状確認用。大きい） |
 | `logEvents` | `true` | サーバーの permission 系イベント（人間の返答など）も同じログに残す |
 
 ## ログ（JSONL）
@@ -101,7 +107,7 @@ judge はルーターの `switchyard/weak-only` を `ctx.generate.text` で呼�
 
 ```json
 {"ts":"...","plugin":"permission-judge","v":2,"kind":"judged",
- "sessionID":"ses_...","agent":"build","action":"shell","resources":["git fetch"],
+ "sessionID":"ses_...","agent":"build","action":"shell","resources":["git fetch"],"command":"git fetch","raw_command":true,
  "cwd":"/path","project":"/path","git":{"branch":"main"},"policy_hash":"none",
  "context_items":3,"context":["user: ...","tool: read {...}"],
  "effect_seen":"ask","prefilter":null,

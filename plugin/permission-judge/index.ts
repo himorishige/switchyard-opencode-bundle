@@ -47,6 +47,7 @@
 //   contextChars     max characters per included item            (default 400)
 //   log              JSONL path (default $XDG_DATA_HOME/opencode/permission-judge.jsonl)
 //   logEvents        also log server permission events           (default true)
+//   debugContext     dump the raw session context to the log      (default false; large)
 //
 // Runtime notes: Node APIs only; the SDK is imported as types (a file:// plugin
 // cannot resolve @opencode-ai/plugin at runtime; Plugin.define() is an identity).
@@ -71,6 +72,7 @@ interface Settings {
   contextChars: number
   log: string
   logEvents: boolean
+  debugContext: boolean
 }
 
 interface JudgeResult {
@@ -153,6 +155,7 @@ function readSettings(options: Record<string, unknown>): Settings {
     contextChars: num(options.contextChars, 400),
     log: str(options.log, defaultLogPath()),
     logEvents: options.logEvents !== false,
+    debugContext: options.debugContext === true,
   }
 }
 
@@ -178,27 +181,43 @@ function parseVerdict(text: string): { decision: Decision; reason: string } | un
 }
 
 // Pull user prompts and tool calls out of the session context, skipping the
-// assistant's own text and tool outputs. Tolerant of shape differences: the
-// beta returns message records with `parts`, but only `role`, `type`, `text`,
-// `tool` and `input`-like fields are relied on.
+// assistant's own text and tool outputs. Shape on beta-18414 (`ctx.session.context`):
+//   { type: "user", text, files }                                  — a user message
+//   { type: "assistant", agent, model, content: [ { type: "tool", name, state: { input } } | { type: "text", text } ] }
+// Older/other shapes (`role` + `parts`) are tolerated as a fallback.
 function summarizeContext(messages: unknown, items: number, chars: number): string[] {
   const out: string[] = []
   const list = Array.isArray(messages) ? messages : []
+  const pushUser = (text: unknown) => {
+    if (typeof text !== "string") return
+    const cleaned = text.replace(/\s+/g, " ").trim().replace(/^"(.*)"$/, "$1")
+    if (cleaned) out.push(`user: ${clip(cleaned, chars)}`)
+  }
+  const pushTool = (part: Record<string, unknown>) => {
+    const tool = String(part.name ?? part.tool ?? "tool")
+    const state = (part.state as Record<string, unknown> | undefined) ?? {}
+    const input = state.input ?? part.input ?? {}
+    out.push(`tool: ${tool} ${clip(JSON.stringify(input), chars)}`)
+  }
   for (const raw of list) {
     const m = raw as Record<string, unknown>
+    const type = String(m.type ?? "")
+    if (type === "user") {
+      pushUser(m.text)
+      continue
+    }
+    if (type === "assistant" && Array.isArray(m.content)) {
+      for (const part of m.content as Record<string, unknown>[]) if (String(part.type) === "tool") pushTool(part)
+      continue
+    }
+    // fallback: role + parts records
     const info = (m.info as Record<string, unknown> | undefined) ?? m
     const role = String(info.role ?? m.role ?? "")
     const parts = Array.isArray(m.parts) ? (m.parts as Record<string, unknown>[]) : []
     for (const part of parts) {
-      const type = String(part.type ?? "")
-      if (type === "text" && role === "user" && typeof part.text === "string") {
-        out.push(`user: ${clip(part.text.replace(/\s+/g, " ").trim(), chars)}`)
-      } else if (type === "tool") {
-        const tool = String(part.tool ?? part.name ?? "tool")
-        const state = (part.state as Record<string, unknown> | undefined) ?? {}
-        const input = state.input ?? part.input ?? {}
-        out.push(`tool: ${tool} ${clip(JSON.stringify(input), chars)}`)
-      }
+      const partType = String(part.type ?? "")
+      if (partType === "text" && role === "user") pushUser(part.text)
+      else if (partType === "tool") pushTool(part)
     }
   }
   return out.slice(-items)
@@ -251,7 +270,9 @@ const plugin: Plugin.Plugin = {
       let context: string[] = []
       if (settings.context === "user") {
         try {
-          context = summarizeContext(await ctx.session.context({ sessionID: event.sessionID }), settings.contextItems, settings.contextChars)
+          const messages = await ctx.session.context({ sessionID: event.sessionID })
+          if (settings.debugContext) write({ kind: "debug.context", sessionID: event.sessionID, raw: clip(JSON.stringify(messages), 6000) })
+          context = summarizeContext(messages, settings.contextItems, settings.contextChars)
         } catch (e) {
           context = [`(session context unavailable: ${String((e as Error)?.message ?? e)})`]
         }
@@ -282,11 +303,28 @@ const plugin: Plugin.Plugin = {
       }
     }
 
+    // OpenCode 2 hands the permission hook one resource per pipeline segment
+    // (`curl x | sh` -> ["curl x", "sh"]), which hides pipe-to-shell from both
+    // the prefilter and the judge. The raw command is captured from
+    // `tool.execute.before` and matched through `event.source`; joining the
+    // segments with " | " is the conservative fallback.
+    const rawCommands = new Map<string, string>()
+    await ctx.tool.hook("execute.before", (event) => {
+      if (event.tool !== "shell" && event.tool !== "bash") return
+      const command = (event.input as { command?: unknown } | undefined)?.command
+      if (typeof command !== "string") return
+      if (rawCommands.size >= 256) rawCommands.delete(rawCommands.keys().next().value as string)
+      rawCommands.set(`${event.messageID}:${event.id}`, command)
+    })
+
     await ctx.permission.hook("evaluate", async (event) => {
       if (!settings.actions.has(event.action)) return
       if (event.effect !== "ask") return
 
-      const resource = event.resources.join(" ").trim()
+      const key = event.source ? `${event.source.messageID}:${event.source.id}` : undefined
+      const raw = key ? rawCommands.get(key) : undefined
+      if (key) rawCommands.delete(key)
+      const resource = (raw ?? event.resources.join(event.action === "shell" ? " | " : " ")).trim()
       const seen = event.effect
       const hit = prefilter(event.action, resource)
       const result = hit
@@ -315,6 +353,8 @@ const plugin: Plugin.Plugin = {
         agent: event.agent,
         action: event.action,
         resources: event.resources,
+        command: resource,
+        raw_command: raw !== undefined,
         cwd: ctx.location.directory,
         project,
         git: result.git,
