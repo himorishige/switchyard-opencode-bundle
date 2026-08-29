@@ -353,6 +353,18 @@ The V2 policy pack in `opencode.v2.jsonc.example` also allows the bundle's read-
 `qwen_mm_plugins_api_*`), denies Code Mode (`execute`), and removes `shell` from the `explore` / `general` subagents —
 a denied action disappears from the model's tool list, so the subagent never even sees it.
 
+## permission-judge (OpenCode 2 only, shadow by default)
+
+[`plugin/permission-judge/`](plugin/permission-judge/) puts an LLM judge on OpenCode 2's permission `evaluate`
+hook. Requests the `permissions` rules leave as `ask` are classified by the router's `weak-only` route; the judge only
+ever says **allow**. `shadow` (default) judges and logs without changing anything, `assist` auto-approves what the
+judge allows and leaves the rest to the human, and `strict` denies the rest with a reason — for `opencode2 run --auto`,
+where an `ask` that reaches the runtime is executed, not asked. Input is reasoning-blind (action, resource, agent,
+cwd, git branch, team policy, recent user prompts and tool calls; never the assistant's own text or tool outputs).
+Every judgement is appended to `$XDG_DATA_HOME/opencode/permission-judge.jsonl` for calibration. Load it after
+tirith-guard. This is the V2 successor of `experimental/permission-judge/` (V1, event stream + async reply), which
+stays frozen. Details and the log schema: [`plugin/permission-judge/README.md`](plugin/permission-judge/README.md).
+
 ## Pi (optional second client)
 
 [Pi](https://pi.dev/) is a minimal coding-agent harness that connects to the same router with a

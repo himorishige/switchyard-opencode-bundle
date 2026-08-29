@@ -127,6 +127,10 @@ OpenCode 2 は v1 plugin API を読み込めません（`index.ts` は `failed t
   （`{ "package": "file:///…/v2.ts", "options": { "bin": "…", "severity": "HIGH", "timeoutMs": 5000, "failMode": "open" } }`）
 - 検証済み（2026-08-28、opencode2 0.0.0-beta-18414）: `--auto` 実行で HIGH finding のコマンドが
   `permission.rejected` として止まり、理由がモデルに返ること。finding のないコマンドは通ること
+- v2 は shell コマンドをパイプライン単位に分割して permission の resource にします（`curl x | sh` →
+  `["curl x", "sh"]`）。セグメント単位では `curl | sh` のような pattern が見えないため、`v2.ts` は
+  `tool.execute.before` で生コマンドを捕まえ、`event.source`（message ID + tool call ID）で permission 要求に
+  突き合わせて **生コマンドのまま** tirith に渡します。捕まえられなかった場合だけセグメントごとに検査します
 - 注意: v2 の plugin API は beta で変わりうる前提です。`v2.ts` は SDK を型としてだけ import します
   （`file://` plugin からは `@opencode-ai/plugin` の実行時 import が解決できないため）
 

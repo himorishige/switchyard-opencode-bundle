@@ -342,6 +342,18 @@ OpenCode 2（opencode2・beta）は v1 plugin を読み込めません。`plugin
 `qwen_mm_plugins_api_*`）を allow、Code Mode（`execute`）を deny、`explore` / `general` subagent から `shell` を
 外しています。deny されたアクションはモデルのツール一覧から消えるため、subagent は shell の存在すら見ません。
 
+## permission-judge（OpenCode 2 専用・既定は shadow）
+
+[`plugin/permission-judge/`](plugin/permission-judge/) は、OpenCode 2 の permission `evaluate` hook に LLM の
+judge を載せます。`permissions` ルールが `ask` に残したリクエストをルーターの `weak-only` route が分類し、judge は
+**allow** しか言いません。`shadow`（既定）は判定してログに残すだけ、`assist` は judge が allow したものを自動承認して
+残りを人間に、`strict` は残りを理由つきで deny します——`opencode2 run --auto` では実行時に残った `ask` は聞かれずに
+実行されるためです。入力は reasoning-blind（action・resource・agent・cwd・git branch・チーム方針・直近のユーザー発話と
+tool 呼び出し。assistant 自身の説明文と tool 出力は見せません）。判定は較正用に
+`$XDG_DATA_HOME/opencode/permission-judge.jsonl` へ追記されます。tirith-guard の後ろに置いてください。
+`experimental/permission-judge/`（v1・イベント購読 + 非同期 reply）の v2 後継で、v1 側は凍結です。
+詳細とログの形式: [plugin/permission-judge/README.md](plugin/permission-judge/README.md)。
+
 ## Pi（任意の第 2 クライアント）
 
 [Pi](https://pi.dev/) は最小構成のコーディングエージェントハーネスです。JSON 1 枚で同じルーターに接続でき、チームスキル（`rag-kb` / `web-search` / `using-bee`）は Agent Skills 標準のためそのまま共用できます。opencode と比べると、headless の画像入力（`pi -p @img "..."`）が動くこと、`--mode json` の機械可読イベントストリーム、サブスクリプション認証（`/login` で ChatGPT Plus/Pro（Codex）・Claude・Copilot）が加わります。主クライアントは引き続き opencode です。
