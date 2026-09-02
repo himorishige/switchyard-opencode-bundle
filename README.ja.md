@@ -397,6 +397,24 @@ curl -s http://127.0.0.1:4100/health
 - classifier target のモデルを変更した場合は、変更後に 1 リクエスト流して judge の健全性を確認してください（`curl -s http://127.0.0.1:4100/v1/stats` → `classifier`）。judge は `extra_body` で思考を抑制していますが、このノブを解釈しないプロバイダもあります。judge の回答が素の `content` の外（reasoning 領域）に出るようになると、全判定が fail-open で strong に倒れます
 - **モデル ID 衝突の罠——1 つはこの構成にも効き、もう 1 つはリリース版を離れた場合だけ効きます。** サーバーは (llm_client, model id) の組で target を重複排除し、重複した片方を黙って落とします——classifier target が専用の `[llm_clients.fireworks_judge]` を使っているのはこのためで、これは 0.2.0 を含む全バージョンに当てはまります。もう 1 つは違います。**#268 以降のビルド**では、サービング呼び出しが route ごとのモデル ID のみをキーとするマップで解決されるため、tier と同一モデルの classifier target に置いた `extra_body` が、その tier のユーザー応答にも適用されます（2026-08-08 実測。2026-08-11 に両ビルドを並べて再測し、リリース版 0.2.0 では起きないことを確認）。**リリース版ではなく main の commit をピンする場合は、先に classifier の `extra_body` を外してください**
 
+### パッチ版ビルド: judge への text 投影（暫定）
+
+Switchyard 0.2.0 は capability judge に会話をクライアントが送ったままの形で渡します。リクエストに画像（`image_url` part）が付いていると、文字専用の judge は HTTP 400 を返し、ルーターはそれを judge 不在として扱って strong tier へ fail-open します。添付つきの依頼は毎回・無音でこうなり、動くのは `switchyard_classifier_fail_open_total{reason="upstream_non_5xx"}` だけです。upstream には [NVIDIA-NeMo/Switchyard#598](https://github.com/NVIDIA-NeMo/Switchyard/issues/598) として報告済みです。
+
+修正入りのリリースが出るまでの暫定として、この bundle は fork ブランチ `fix/judge-text-projection-0.2.0`（0.2.0 + パッチ）からビルドできます。judge には画像の代わりに `[image attachment]` という placeholder が渡り、judge は文字で判定し、選ばれた tier へ転送されるリクエストは元のままです。設定面は 0.2.0 と同じなので `routes.toml` は変更不要です。
+
+```bash
+# fork ブランチからローカルでビルド（10〜20 分）
+docker compose build --build-arg SWITCHYARD_SOURCE=git
+docker compose up -d --force-recreate
+
+# またはビルド済みイメージ（linux/arm64 + linux/amd64）
+#   ghcr.io/himorishige/switchyard-server:0.2.0-judge-text-projection
+# を switchyard サービスの `image:` に指定する
+```
+
+戻すときは build arg なしで再ビルド（crates.io の 0.2.0）するか、`image:` を戻します。`GET /metrics` で `upstream_non_5xx` の fail-open カウンタが添付つき依頼で増えなくなること、routing log に classifier 行が出ることを確認してください。同梱の classifier（`deepseek-v4-flash-0731`）では添付つき依頼も文字だけで判定されるので、weak tier に落ちる頻度は judge と閾値次第で、このパッチが決めるものではありません。
+
 ### 定期レビュー（ルーティング実績の回収）
 
 週次など定期のタイミングで 1 コマンド:

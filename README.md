@@ -413,6 +413,40 @@ Things to keep in mind:
 - If you change the classifier target's model, send one request afterwards and check judge health (`curl -s http://127.0.0.1:4100/v1/stats` → `classifier`). The judge suppresses its reasoning through `extra_body`, and not every provider honors that knob; if a verdict ends up outside plain `content`, every judgment fails open to strong
 - **Model-id collisions: one trap applies here, one only if you leave the released version.** The server dedupes targets by (llm_client, model id) and silently drops one of the duplicates — that is why the classifier target keeps its own `[llm_clients.fireworks_judge]` entry. That trap applies to every version, 0.2.0 included. The second one does not: builds from #268 onward resolve serving calls through a per-route map keyed by model id alone, so a classifier target sharing a model with a tier leaks its `extra_body` into that tier's user responses (measured 2026-08-08; re-measured 2026-08-11 with both builds side by side, released 0.2.0 is unaffected). **If you ever pin a main commit instead of a release, remove the classifier's `extra_body` first**
 
+### Patched build: judge text projection (temporary)
+
+Switchyard 0.2.0 hands the capability judge the conversation exactly as the
+client sent it. When a request carries an image (`image_url` part), a
+text-only judge answers HTTP 400, the router treats that as an unavailable
+judge and falls open to the strong tier - on every attached request, silently
+(only `switchyard_classifier_fail_open_total{reason="upstream_non_5xx"}`
+moves). Reported upstream as
+[NVIDIA-NeMo/Switchyard#598](https://github.com/NVIDIA-NeMo/Switchyard/issues/598).
+
+Until a release carries the fix, this bundle can build 0.2.0 plus the patch
+from the fork branch `fix/judge-text-projection-0.2.0`: the judge sees a
+`[image attachment]` placeholder instead of the image, judges the text, and
+the request forwarded to the selected tier is untouched. Same config surface
+as 0.2.0, so `routes.toml` does not change.
+
+```bash
+# build locally from the fork branch (10-20 min)
+docker compose build --build-arg SWITCHYARD_SOURCE=git
+docker compose up -d --force-recreate
+
+# or pull the prebuilt image (linux/arm64 + linux/amd64)
+#   ghcr.io/himorishige/switchyard-server:0.2.0-judge-text-projection
+# and point the `image:` of the switchyard service at it.
+```
+
+To roll back, rebuild without the build arg (crates.io 0.2.0) or point
+`image:` back. Check `GET /metrics`: the `upstream_non_5xx` fail-open counter
+should stop increasing on attached requests, and the routing log should show
+a classifier row for them. Note that with the bundled classifier
+(`deepseek-v4-flash-0731`) attached requests are still judged from the text
+alone; how often they land on the weak tier depends on the judge and the
+threshold, not on this patch.
+
 ### Periodic review (collecting routing stats)
 
 Weekly, or on whatever cadence you choose, run one command:
