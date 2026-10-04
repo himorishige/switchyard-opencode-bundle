@@ -1,0 +1,118 @@
+diff --git a/crates/libsy/src/algorithms/util.rs b/crates/libsy/src/algorithms/util.rs
+index 3f1202e..b327153 100644
+--- a/crates/libsy/src/algorithms/util.rs
++++ b/crates/libsy/src/algorithms/util.rs
+@@ -4,6 +4,7 @@
+ pub mod affinity;
+ pub(crate) mod classifier_contract;
+ pub mod escalation;
++pub(crate) mod judge_text;
+ pub(crate) mod llm_judge;
+ pub(crate) mod prompts;
+ pub(crate) mod robustness;
+diff --git a/crates/libsy/src/algorithms/util/escalation.rs b/crates/libsy/src/algorithms/util/escalation.rs
+index 54ded69..b7bbc88 100644
+--- a/crates/libsy/src/algorithms/util/escalation.rs
++++ b/crates/libsy/src/algorithms/util/escalation.rs
+@@ -205,7 +205,11 @@ fn collect_text(content: &[ContentBlock], parts: &mut Vec<String>) {
+                 parts.push(format!("tool_call {}({})", call.name, call.arguments));
+             }
+             ContentBlock::ToolResult(result) => collect_text(&result.content, parts),
+-            _ => {}
++            _ => {
++                if let Some(marker) = super::judge_text::attachment_marker(block) {
++                    parts.push(marker.to_string());
++                }
++            }
+         }
+     }
+ }
+diff --git a/crates/libsy/src/algorithms/util/judge_text.rs b/crates/libsy/src/algorithms/util/judge_text.rs
+new file mode 100644
+index 0000000..97baf41
+--- /dev/null
++++ b/crates/libsy/src/algorithms/util/judge_text.rs
+@@ -0,0 +1,67 @@
++// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++// SPDX-License-Identifier: Apache-2.0
++
++//! Text projection for local text-only judges; serving requests retain their attachments.
++
++use switchyard_protocol::ContentBlock;
++
++/// A short marker retains attachment presence without carrying its payload into the judge.
++pub(crate) fn attachment_marker(block: &ContentBlock) -> Option<&'static str> {
++    match block {
++        ContentBlock::Image { .. } => Some("[image attachment]"),
++        ContentBlock::Audio { .. } => Some("[audio attachment]"),
++        ContentBlock::Video { .. } => Some("[video attachment]"),
++        ContentBlock::File { .. } => Some("[file attachment]"),
++        ContentBlock::Unknown { .. } => Some("[unsupported content]"),
++        _ => None,
++    }
++}
++
++/// Projects an owned judge view, including nested tool results, without editing the source.
++pub(crate) fn project(content: &mut [ContentBlock]) {
++    for block in content {
++        if let Some(marker) = attachment_marker(block) {
++            *block = ContentBlock::Text {
++                text: marker.into(),
++            };
++        } else if let ContentBlock::ToolResult(result) = block {
++            project(&mut result.content);
++        }
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use switchyard_protocol::{ImageSource, ToolResult};
++
++    /// Tool IDs, ordering and the original serving payload survive the judge projection.
++    #[test]
++    fn replaces_nested_payloads_without_mutating_the_original() {
++        let image = ContentBlock::Image {
++            source: ImageSource::Base64 {
++                media_type: Some("image/png".into()),
++                data: "private-payload".into(),
++            },
++        };
++        let original = vec![
++            ContentBlock::Text {
++                text: "inspect".into(),
++            },
++            image.clone(),
++            ContentBlock::ToolResult(ToolResult {
++                tool_call_id: "call-1".into(),
++                content: vec![image],
++                is_error: Some(false),
++            }),
++        ];
++        let mut projected = original.clone();
++        project(&mut projected);
++        assert!(matches!(original[1], ContentBlock::Image { .. }));
++        assert_eq!(projected[0], original[0]);
++        let encoded = serde_json::to_string(&projected).unwrap();
++        assert!(!encoded.contains("private-payload"));
++        assert_eq!(encoded.matches("[image attachment]").count(), 2);
++        assert!(encoded.contains("call-1"));
++    }
++}
+diff --git a/crates/libsy/src/algorithms/util/llm_judge.rs b/crates/libsy/src/algorithms/util/llm_judge.rs
+index ca5d1e3..7d804f0 100644
+--- a/crates/libsy/src/algorithms/util/llm_judge.rs
++++ b/crates/libsy/src/algorithms/util/llm_judge.rs
+@@ -156,7 +156,10 @@ where
+     type Verdict = D::Verdict;
+ 
+     fn build_request(&self, state: &State, request: &Request) -> Request {
+-        let messages = self.input.build_messages(state, request);
++        let mut messages = self.input.build_messages(state, request);
++        for message in &mut messages {
++            super::judge_text::project(&mut message.content);
++        }
+         Request {
+             llm_request: LlmRequest {
+                 model: request.llm_request.model.clone(),

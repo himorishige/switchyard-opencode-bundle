@@ -1,0 +1,6 @@
+services:
+  switchyard:
+    image: switchyard-opencode-switchyard:main-9a743e8-local1
+    build:
+      context: .
+      dockerfile: Dockerfile.local

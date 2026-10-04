@@ -1,0 +1,17 @@
+# Fixed upstream source plus two reviewed local patches.
+FROM rust:1.96.1-bookworm AS builder
+WORKDIR /opt/switchyard
+RUN git init . && git remote add origin https://github.com/NVIDIA-NeMo/Switchyard.git \
+    && git fetch --depth=1 origin 9a743e89223a0d5b14011f1226d5b068f730a3b8 \
+    && git checkout --detach FETCH_HEAD
+COPY switchyard-local-patches /tmp/patches
+RUN git apply /tmp/patches/0001-isolate-judge-target.patch \
+    && git apply /tmp/patches/0002-project-judge-attachments.patch \
+    && cargo build --locked --release -p switchyard-server
+
+# Local rollback image retained on the deployment host.
+FROM switchyard-opencode-switchyard:pre-main-20260906
+COPY --from=builder /opt/switchyard/target/release/switchyard-server /usr/local/bin/switchyard-server
+LABEL org.opencontainers.image.source="https://github.com/NVIDIA-NeMo/Switchyard"
+LABEL org.opencontainers.image.revision="9a743e89223a0d5b14011f1226d5b068f730a3b8"
+LABEL io.switchyard.local.patchset="b409060a54b489e378c38d44fe4ed77fba675bb19b31424d41c8cd7e294e99a4"

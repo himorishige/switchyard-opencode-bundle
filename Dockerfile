@@ -20,9 +20,26 @@ FROM rust:${RUST_VERSION}-bookworm AS builder
 # code.
 ARG SWITCHYARD_VERSION=0.2.0
 
-RUN cargo install --locked switchyard-server \
-        --version "${SWITCHYARD_VERSION}" \
-        --root /opt/out
+# Source switch. Default `crates` installs the released crate above. `git`
+# builds the same 0.2.0 plus the judge text-projection patch from the fork
+# branch below (upstream NVIDIA-NeMo/Switchyard#598: an attached image reached
+# the judge verbatim, a text-only judge answered 400, and the route fell open
+# to the strong tier on every attached turn). Same config surface as 0.2.0.
+# Switch back to `crates` once a release with the fix is published.
+#   docker compose build --build-arg SWITCHYARD_SOURCE=git
+ARG SWITCHYARD_SOURCE=crates
+ARG SWITCHYARD_GIT_URL=https://github.com/himorishige/Switchyard.git
+ARG SWITCHYARD_GIT_REF=fix/judge-text-projection-0.2.0
+
+RUN if [ "${SWITCHYARD_SOURCE}" = "git" ]; then \
+        cargo install --locked switchyard-server \
+            --git "${SWITCHYARD_GIT_URL}" --branch "${SWITCHYARD_GIT_REF}" \
+            --root /opt/out; \
+    else \
+        cargo install --locked switchyard-server \
+            --version "${SWITCHYARD_VERSION}" \
+            --root /opt/out; \
+    fi
 
 # --- runtime: static-ish binary on a slim base. Half the size of the old
 # Python image, and no site-packages patch: reasoning suppression for the
