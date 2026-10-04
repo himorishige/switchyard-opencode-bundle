@@ -1,10 +1,6 @@
-# Switchyard native (Rust) server config.
-# Successor of route.yaml (route-bundle `type: deterministic`, removed upstream in #268).
-# Route ids are unchanged from the legacy bundle, so opencode configs need no change:
-#   auto / strong-only / weak-only / k3-only
-# After editing, validate before restart:
-#   docker compose run --rm switchyard --config /app/routes.toml --dry-run
-
+# Mac Switchyard: Lightning judge on node1 over Tailscale; GLM weak / Kimi strong.
+# Thresholds are inherited, not recalibrated for the new weak model.
+# Requires main 9a743e8 plus the verified local target/attachment patches.
 schema_version = 1
 
 [llm_clients.fireworks]
@@ -12,57 +8,25 @@ format = "openai_chat"
 base_url = "https://api.fireworks.ai/inference/v1"
 api_key_env = "FIREWORKS_API_KEY"
 
-# Separate client for the judge: the server dedupes targets by (llm_client, model id)
-# and would silently drop either the classifier or the weak target otherwise (they
-# share deepseek-v4-flash-0731 but differ in extra_body). A distinct client name keeps
-# both, and matches the upstream advice to give the classifier its own client/quota.
-[llm_clients.fireworks_judge]
+[llm_clients.lightning_judge]
 format = "openai_chat"
-base_url = "https://api.fireworks.ai/inference/v1"
-api_key_env = "FIREWORKS_API_KEY"
+base_url = "http://100.123.43.82:8000/v1"
 
-# Classifier = weak-tier model doubling as judge (same pattern as the legacy bundle).
-#
-# Thinking suppression for the judge. A verdict is a probability, not an essay,
-# so letting the judge reason costs seconds and tokens for nothing. Fireworks
-# accepts reasoning_effort "none" even though the model card lists only
-# low/medium/high. temperature 0 pins near-threshold verdicts, which otherwise
-# flip across reruns (2/10 in the M2 variance probe).
-#
-# Measured 2026-08-11 over the 87-judgment calibration set, suppressed vs not:
-# judge p50 2.2s vs 10.4s, p90 4.4s vs 44.5s. Agent-loop shapes are unaffected
-# (30/30 weak either way); the difference shows up only on open-ended business
-# sparring, which lands on weak more often when the judge does not think
-# (9/13 vs 12/13 reaching strong). We accept that: a three-way blind comparison
-# on that same set found weak/strong answers equally usable there.
-#
-# IMPORTANT - do not carry this to an unreleased build. Between #268 and at
-# least main @ fb3fc308, serving calls resolve through a per-route map keyed by
-# MODEL ID (build_client_router), so a target's extra_body is applied to any
-# other target sharing its id - here, the weak tier's USER responses were
-# silently generated with reasoning suppressed (repro + measurements in
-# bugfix-extrabody-leak/ and phase3/calib-v020/). Released 0.2.0 predates that
-# refactor and keeps each target's backend separate, which is why this block is
-# safe again. Both binaries report "switchyard-server 0.2.0", so verify by
-# behavior, not by version string.
 [targets.classifier]
-id = "accounts/fireworks/models/deepseek-v4-flash-0731"
-llm_client = "fireworks_judge"
-extra_body = { reasoning_effort = "none", temperature = 0 }
+id = "judge"
+llm_client = "lightning_judge"
+extra_body = { temperature = 0, chat_template_kwargs = { enable_thinking = false } }
 
 [targets.strong]
-id = "accounts/fireworks/models/deepseek-v4-pro-0813"
+id = "accounts/fireworks/models/kimi-k3"
 llm_client = "fireworks"
 
-# Kimi K3 stays as its own target for the k3-only route: sparring/planning seat
-# (opencode pins the plan agent here) and the vision-capable manual image lane.
-# Reusing the plain `fireworks` client is safe: no other target shares this id.
 [targets.k3]
 id = "accounts/fireworks/models/kimi-k3"
 llm_client = "fireworks"
 
 [targets.weak]
-id = "accounts/fireworks/models/deepseek-v4-flash-0731"
+id = "accounts/fireworks/models/glm-5p3-flash"
 llm_client = "fireworks"
 
 [routes.auto]
@@ -72,34 +36,12 @@ mode = "capability"
 classifier_target = "classifier"
 strong_target = "strong"
 weak_target = "weak"
-# Calibrated from the measured p_solve distribution (M2, 87 judgments, 2026-08-08):
-# 0.75 keeps all quality-verified bench/production-shape cases on weak (30/30 + 10/10)
-# while deep business sparring reaches strong 12/13 (9/13 at the 0.5 default).
-# Effective thresholds: supported 0.75 / uncertain・unmatched 0.85 / unsupported 0.95.
 base_threshold = 0.75
 threshold_step = 0.1
-session_affinity = true
+classify_trigger = "new_session"
 message_hash_fallback = true
-# How much of the conversation the judge sees. Unset, it reads only the opening
-# user task and the latest user message - and on a coding turn that is too little
-# to forecast with, so the judge thinks its way to an answer instead. Showing it
-# the trailing turns (assistant replies and tool results) settles the question
-# immediately: measured over 320 judgments on real agent-loop shapes, the routing
-# decision did not change, while judge thinking fell from ~1,700 tokens to ~250
-# and judgment latency went from p50 17.5s / p90 30.6s to p50 3.0s / p90 4.9s.
-# The effect saturates at 2; 4 leaves room for the tool-pair rule below to widen
-# the window without losing turns, and costs ~2% more prompt tokens than 2.
-# Note the server never splits a tool result from the call it answers - the
-# window start moves back to keep pairs whole (upstream PR #309).
-# Measurements: window-eval/results.md in the project workspace.
 recent_turn_window = 4
 
-# Opt-in: evidence-based escalation. Every session starts on the weak tier; a
-# trajectory judge watches for a clear pattern of trouble (repeated identical
-# failures, false progress) and latches the session to strong after 2
-# consecutive escalate verdicts. Trade-offs vs `auto`: responses are buffered
-# (not truly streamed) until the latch, the confirming turn pays both tiers,
-# and the latch is one-way per session. See README "Evidence-based escalation".
 [routes.auto-esc]
 id = "auto-esc"
 type = "llm_classifier"
@@ -119,42 +61,16 @@ id = "weak-only"
 type = "passthrough"
 target = "weak"
 
-# Kimi K3, pinned. Formerly an alias of strong-only; since the strong tier moved
-# to deepseek-v4-pro-0813 (2026-08-14) this is the dedicated K3 seat: the plan
-# agent's sparring partner and the manual lane for image attachments (K3 reads
-# images; the strong tier does not). The route id predates the split and stays -
-# opencode raises UnknownError for model ids that disappear from provider config.
 [routes.k3-only]
 id = "k3-only"
 type = "passthrough"
 target = "k3"
 
-# --- An eye for the text-only weak tier (Qwen-MM-Plugins) ---
-# The weak tier rejects image input; instead of moving the tier to a costlier vision
-# model, images are handled by Qwen-MM-Plugins tools that call this route and hand the
-# brain a text description. Serving the route is inert until the plugin's MCP entry is
-# added on the opencode side - setup, costs, and limits: docs/qwen-mm-plugins.md.
-#
-# extra_body suppresses the reasoning pass. qwen3p7-plus thinks on every call - naming four
-# items in a photo cost 845 completion tokens and 2.95s with it on, 302 tokens and 1.61s with
-# it off, at identical accuracy. Qwen-MM-Plugins has no knob for this, so the router injects it
-# for every caller at once. Fireworks accepts "none" even though the model card lists only
-# low/medium/high.
-#
-# Reusing the plain `fireworks` client is safe here: the server dedupes targets by
-# (llm_client, model id), and no other target uses this model id. If you ever point this at
-# the same model as [targets.weak], declare a second llm_client for it instead.
 [targets.fw_qwen_vl]
 id = "accounts/fireworks/models/qwen3p7-plus"
 llm_client = "fireworks"
 extra_body = { reasoning_effort = "none" }
 
-# The route id is deliberately the plugin's DEFAULT model name (shared/api_openai.py
-# DEFAULT_MODEL). Because of that, pointing DASHSCOPE_BASE_URL at this router is the only
-# configuration needed - no per-call `model` argument, no patch to the plugin.
-#
-# passthrough, so the classifier never sees the image payload and you are not billed for
-# routing decisions on media calls.
 [routes.omni-vision]
 id = "qwen3.7-plus"
 type = "passthrough"

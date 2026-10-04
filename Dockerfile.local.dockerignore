@@ -1,0 +1,4 @@
+**
+!Dockerfile.local
+!switchyard-local-patches/
+!switchyard-local-patches/*.patch
